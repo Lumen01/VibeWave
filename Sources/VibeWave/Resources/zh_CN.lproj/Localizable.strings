@@ -1,0 +1,376 @@
+/*
+ * VibeWave Localizable Strings
+ * Chinese (Simplified) - zh_CN
+ */
+
+// MARK: - Navigation
+"nav.overview" = "总览";
+"nav.history" = "历史";
+"nav.insights" = "洞察";
+"nav.projects" = "项目";
+"nav.settings" = "设定";
+
+// MARK: - App Name
+"app.name" = "VibeWave";
+
+// MARK: - KPI Cards
+"kpi.sessions" = "会话";
+"kpi.messages" = "消息";
+"kpi.cost" = "花费";
+"kpi.input" = "输入";
+"kpi.output" = "输出";
+"kpi.reasoning" = "推理";
+"kpi.cacheRead" = "缓存读取";
+"kpi.cacheWrite" = "缓存写入";
+"kpi.avgPerSession" = "平均/会话";
+
+// MARK: - KPI Short (for compact display)
+"kpi.short.sessions" = "Sessions";
+"kpi.short.messages" = "Messages";
+"kpi.short.cost" = "Cost";
+"kpi.short.input" = "Input";
+"kpi.short.output" = "Output";
+"kpi.short.reasoning" = "Reasoning";
+"kpi.short.cacheRead" = "Cache R";
+"kpi.short.cacheWrite" = "Cache W";
+"kpi.short.avgPerSession" = "Avg/Session";
+
+// MARK: - Chart Titles
+"chart.tokens" = "Tokens";
+"chart.topProjects" = "Top 5 项目";
+"chart.topModels" = "Top 5 模型";
+"chart.netCode" = "净增代码";
+"chart.sessions" = "会话";
+"chart.history" = "历史";
+"chart.tokenUsage" = "Token 用量";
+"chart.activity" = "活动";
+"chart.consumptionEfficiency" = "消耗和效能";
+"chart.modelLens" = "模型透镜";
+"chart.userRhythm" = "用户节奏";
+"chart.workIntensity" = "工作强度分布";
+"chart.intensity24h" = "24h 强度分布";
+"chart.peak" = "峰值:";
+"chart.average" = "平均:";
+
+// MARK: - Chart Columns
+"chart.column.input" = "Input";
+"chart.column.output" = "Output";
+"chart.column.reasoning" = "Reasoning";
+"chart.column.netCode" = "净增代码";
+"chart.column.session" = "会话";
+"chart.column.message" = "消息";
+"chart.total" = "Total:";
+"chart.cumulative" = "累计";
+"chart.delta" = "增量";
+"chart.type" = "图表类型";
+
+// MARK: - History
+"history.usage" = "用量历史";
+"history.activity" = "活动历史";
+"history.trend" = "趋势与增量";
+"history.inputTokensCumulative" = "Input Tokens 累计";
+"history.messageDurationCumulative" = "消息时长累计";
+
+// MARK: - Time Range
+"time.today" = "今天";
+"time.yesterday" = "昨天";
+"time.thisWeek" = "本周";
+"time.lastWeek" = "上周";
+"time.thisMonth" = "本月";
+"time.lastMonth" = "上月";
+"time.thisYear" = "今年";
+"time.all" = "全部";
+"time.24hours" = "24小时";
+"time.30days" = "30天";
+"time.allTime" = "所有";
+"time.todayShort" = "今日";
+"time.30daysShort" = "30天";
+"time.allTimeShort" = "所有";
+
+// MARK: - Common
+"common.loading" = "加载中...";
+"common.noData" = "暂无数据";
+"common.noDataShort" = "无数据";
+"common.retry" = "重试";
+"common.confirm" = "确认";
+"common.cancel" = "取消";
+"common.done" = "完成";
+"common.save" = "保存";
+"common.error" = "错误";
+"common.success" = "成功";
+"common.failed" = "失败";
+"common.ok" = "确定";
+"common.yes" = "是";
+"common.no" = "否";
+"common.close" = "关闭";
+"common.back" = "返回";
+"common.next" = "下一步";
+"common.previous" = "上一步";
+
+// MARK: - Settings - Data Source
+"settings.data" = "数据";
+"settings.dataSource" = "数据来源";
+"settings.dataSourcePath" = "OpenCode 数据库路径";
+"settings.choosePath" = "选择路径…";
+"settings.restoreDefault" = "恢复默认";
+"settings.defaultSource" = "默认来源：";
+"settings.confirmDataSource" = "确认数据来源";
+"settings.dataSourceHelp" = "支持选择 opencode.db 文件，或包含该文件的目录";
+"settings.choosePathHelp" = "打开文件选择器（显示隐藏文件和目录）";
+"settings.restoreDefaultHelp" = "恢复为默认路径：~/.local/share/opencode/opencode.db";
+
+// MARK: - Settings - Sync
+"settings.syncStrategy" = "同步策略";
+"settings.syncStrategyHelp" = "选择自动监听或定时同步策略";
+"settings.sync.auto" = "自动";
+"settings.sync.1min" = "1分钟";
+"settings.sync.5min" = "5分钟";
+"settings.sync.10min" = "10分钟";
+"settings.sync.15min" = "15分钟";
+"settings.sync.autoDesc" = "监控数据目录变化自动同步";
+"settings.sync.intervalDesc" = "按设定间隔扫描并增量同步（不监听文件变化）";
+
+// MARK: - Settings - Backup
+"settings.backup" = "备份";
+"settings.enableBackup" = "启用自动备份";
+"settings.backupDescription" = "定期自动创建数据库备份，防止数据丢失";
+"settings.backupRetention" = "自动备份保留数量";
+"settings.backupRetentionHelp" = "只对自动备份生效，超过数量后自动清理最旧的自动备份";
+"settings.backupInterval" = "备份间隔";
+"settings.backupNow" = "立即备份（手动）";
+"settings.backupNowHelp" = "手动备份不会被自动清理，需要时可手动删除";
+"settings.backupList" = "备份列表";
+"settings.backup.createdAt" = "创建时间:";
+"settings.backup.size" = "大小:";
+"settings.backupIntervalHelp" = "设置自动备份的执行频率";
+"settings.enableBackupHelp" = "启用后自动创建数据库备份";
+"settings.backup.auto" = "自动备份";
+"settings.backup.manual" = "手动备份";
+"settings.backup.system" = "系统备份";
+"settings.backup.interval.6h" = "每 6 小时";
+"settings.backup.interval.12h" = "每 12 小时";
+"settings.backup.interval.24h" = "每 24 小时";
+"settings.backup.interval.48h" = "每 48 小时";
+"settings.restoreBackup" = "恢复备份";
+"settings.deleteBackup" = "删除备份";
+"settings.confirmRestore" = "确认恢复备份？";
+"settings.restoreWarning" = "将覆盖当前数据库，操作不可撤销。";
+"settings.backupSuccess" = "备份成功";
+"settings.backupFailed" = "备份失败: ";
+"settings.restoreSuccess" = "恢复成功";
+"settings.restoreFailed" = "恢复失败: ";
+"settings.deleteSuccess" = "删除成功";
+"settings.deleteFailed" = "删除失败: ";
+"settings.backupNotInitialized" = "备份管理器未初始化";
+"settings.backup.kind.automatic" = "自动";
+"settings.backup.kind.manual" = "手动";
+"settings.backup.kind.system" = "系统";
+"settings.backup.kind.legacy" = "旧";
+
+// MARK: - Settings - Appearance
+"settings.general" = "通用";
+"settings.appearance" = "外观";
+"settings.languages" = "语言";
+"settings.theme" = "主题";
+"settings.theme.system" = "系统";
+"settings.theme.light" = "浅色";
+"settings.theme.dark" = "深色";
+"settings.themeHelp" = "选择应用的主题模式，跟随系统或固定浅色/深色";
+"settings.iconStyle" = "图标风格";
+"settings.languageRestartHint" = "切换语言后重启应用生效";
+
+// MARK: - Settings - Log
+"settings.log" = "日志";
+"settings.logLevel" = "日志级别";
+"settings.logLevel.verbose" = "详细";
+"settings.logLevel.error" = "错误";
+"settings.logLevel.warn" = "警告";
+"settings.logLevel.info" = "信息";
+"settings.logLevel.debug" = "调试";
+"settings.logLevelDesc" = "仅输出不低于该级别的日志，用于开发调试";
+
+// MARK: - Settings - Groups
+"settings.group.dataSync" = "数据同步";
+"settings.group.backupRestore" = "备份与恢复";
+"settings.group.appearance" = "外观";
+"settings.group.log" = "日志";
+
+// MARK: - Error Messages
+"error.loadFailed" = "刷新失败";
+"error.cannotLoadStats" = "无法加载统计数据";
+"error.confirmDataSource" = "确认数据来源";
+"error.invalidDataSource" = "无效的数据来源";
+"error.dataSourceUnavailable" = "数据来源路径不可用";
+"error.loadStats" = "无法加载统计数据";
+"error.failedToLoad" = "无法加载统计数据";
+
+// MARK: - Insights - Metrics
+"insight.inputTokens" = "Input Tokens";
+"insight.messages" = "消息";
+"insight.cost" = "Cost";
+"insight.all" = "全部";
+"insight.weekday" = "工作日";
+"insight.weekend" = "周末";
+"insight.model" = "模型";
+"insight.provider" = "供应商";
+"insight.tps" = "TPS";
+"insight.input" = "Input";
+"insight.outputTPS" = "Output TPS";
+"insight.tpsCoverage" = "TPS 覆盖率";
+"insight.tpsCoverageWithData" = "TPS 覆盖率 %d%%（基于有效完成时长消息）";
+"insight.tpsCoverageAggregated" = "TPS 覆盖率 --（聚合数据）";
+
+// MARK: - Insights - Additional
+"insight.userRhythm" = "用户节奏";
+"insight.workIntensity" = "工作强度分布";
+"insight.modelLens" = "模型透镜";
+"insight.24hIntensity" = "24h 强度分布";
+"insight.noModelData" = "暂无模型数据";
+
+// MARK: - Insights - Filters
+"insight.filter.dayType" = "日类型";
+"insight.filter.distribution" = "分布指标";
+"insight.filter.dimension" = "维度";
+"insight.filter.heatmapMetric" = "热力指标";
+"insight.filter.metric.inputTokens" = "Input";
+"insight.filter.metric.messages" = "消息";
+
+// MARK: - Insights - Enum Values
+"insight.metric.inputTokens" = "Input";
+"insight.metric.messages" = "消息";
+"insight.metric.cost" = "成本";
+"insight.dayType.all" = "全部";
+"insight.dayType.weekdays" = "工作日";
+"insight.dayType.weekends" = "周末";
+"insight.groupBy.model" = "模型";
+"insight.groupBy.provider" = "供应商";
+"insight.tpsCoverageBasedOn" = "基于有效完成时长消息";
+
+// MARK: - Insights - Time Ranges
+"insight.recent365Days" = "最近365天";
+"insight.little" = "少";
+"insight.much" = "多";
+
+// MARK: - Insights - Comparison
+"insight.weekdayVsWeekend" = "工作日 vs 周末";
+"insight.weekdayTotal" = "工作日 ";
+"insight.weekendTotal" = "周末 ";
+"insight.total" = "总量: ";
+
+// MARK: - Insights - Time Periods
+"insight.night" = "夜间 0-8";
+"insight.daytime" = "白天 8-16";
+"insight.evening" = "晚上 16-24";
+
+// MARK: - Consumption Efficiency
+"consumption.consumptionAndEfficiency" = "消耗和效能";
+"consumption.cost" = "成本";
+"consumption.input" = "Input";
+"consumption.output" = "Output";
+"consumption.reasoning" = "Reasoning";
+"consumption.perCodeLines" = "每行代码";
+"consumption.automationLevel" = "自动化程度";
+
+// MARK: - Session Depth
+"session.depth" = "会话深度";
+"session.depth.shallow" = "浅层";
+"session.depth.medium" = "中层";
+"session.depth.deep" = "深层";
+"session.depth.desc" = "对话轮数：浅层≤5, 中层 6-15，深层>15";
+"session.depth.range" = "≤5";
+"session.depth.rangeMedium" = "6-15";
+"session.depth.rangeDeep" = ">15";
+
+// MARK: - Code Impact
+"code.fileEdit" = "文件编辑";
+"code.fileIncludeDoc" = "文件包括代码和文档";
+"code.lines" = "行";
+"code.files" = "文件";
+"code.additions" = "添加";
+"code.deletions" = "删除";
+"code.netCodeLines" = "净增代码行数";
+
+// MARK: - Project Stats
+"project.projectList" = "项目列表";
+"project.activeDays" = "活跃天数";
+"project.activeDaysShort" = "active days";
+"project.activityOutput" = "活动与产出";
+"project.netCodeLines" = "净增代码行数";
+"project.totalDuration" = "总时长";
+"project.noProjectData" = "暂无项目数据";
+"project.importDataHint" = "导入 OpenCode 数据以查看项目统计";
+"project.activeDaysDesc" = "统计有活动的自然日";
+"project.lastActive" = "最近活跃：";
+"project.unknown" = "未知";
+"project.days" = "天";
+"project.hours" = "小时";
+"project.minutes" = "分钟";
+"project.seconds" = "秒";
+"project.sessionCount" = "sessions";
+"project.messageCount" = "messages";
+"project.tokens" = "tokens";
+"project.cost" = "成本";
+"project.day" = "天";
+
+// MARK: - Top3 Metrics
+"top3.netCodeLines" = "净增代码";
+"top3.messages" = "消息";
+"top3.totalDuration" = "消息时长";
+"top3.cost" = "成本";
+
+// MARK: - Model & Agent
+"modelAndAgent.title" = "模型和Agent";
+"model.model" = "模型";
+"model.agent" = "Agent";
+"model.usageRatio" = "使用比例";
+"model.noModelData" = "暂无模型数据";
+"model.dimension.model" = "模型";
+"model.dimension.provider" = "供应商";
+"model.noData" = "无数据";
+"model.statDimension" = "统计维度";
+
+// MARK: - Menu Bar
+"menuBar.totalUsage" = "总用量：";
+"menuBar.days" = "%d天";
+"menuBar.from" = "自";
+"menuBar.since" = "自";
+"menuBar.open" = "打开";
+"menuBar.quit" = "退出";
+
+// Menu Bar - Main Menu
+"menu.about" = "关于 VibeWave";
+"menuBar.topModels" = "Top 5 模型";
+"menuBar.topProjects" = "Top 5 项目";
+"menuBar.kpi.sessions" = "Sessions";
+"menuBar.kpi.messages" = "Messages";
+"menuBar.kpi.cost" = "Cost";
+"menuBar.kpi.input" = "Input";
+"menuBar.kpi.output" = "Output";
+"menuBar.kpi.reasoning" = "Reasoning";
+"menuBar.kpi.cacheRead" = "Cache R";
+"menuBar.kpi.cacheWrite" = "Cache W";
+"menuBar.kpi.avgPerSession" = "Avg/Session";
+
+// MARK: - Import
+"import.data" = "Import Data...";
+
+// MARK: - Languages
+"lang.en" = "English";
+"lang.zh_CN" = "简体中文";
+
+// MARK: - Chart Display
+"chart.separator" = "·";
+
+// MARK: - Aggregation Dimension
+"dimension.project" = "项目";
+"dimension.model" = "模型";
+
+// MARK: - About
+"about.tab" = "关于";
+"about.version" = "版本";
+"about.build" = "构建号";
+"about.copyright" = "版权所有";
+"about.developer" = "开发者";
+"about.github" = "GitHub";
+"about.twitter" = "Twitter / 𝕏";
+"about.description" = "一款 macOS 原生应用，让你洞察自己的 Vibe Coding 节奏。";

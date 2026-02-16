@@ -1,0 +1,376 @@
+/*
+ * VibeWave Localizable Strings
+ * English - Default (Base)
+ */
+
+// MARK: - Navigation
+"nav.overview" = "Overview";
+"nav.history" = "History";
+"nav.insights" = "Insights";
+"nav.projects" = "Projects";
+"nav.settings" = "Settings";
+
+// MARK: - App Name
+"app.name" = "VibeWave";
+
+// MARK: - KPI Cards
+"kpi.sessions" = "Sessions";
+"kpi.messages" = "Messages";
+"kpi.cost" = "Cost";
+"kpi.input" = "Input";
+"kpi.output" = "Output";
+"kpi.reasoning" = "Reasoning";
+"kpi.cacheRead" = "Cache Read";
+"kpi.cacheWrite" = "Cache Write";
+"kpi.avgPerSession" = "Avg/Session";
+
+// MARK: - KPI Short (for compact display)
+"kpi.short.sessions" = "Sessions";
+"kpi.short.messages" = "Messages";
+"kpi.short.cost" = "Cost";
+"kpi.short.input" = "Input";
+"kpi.short.output" = "Output";
+"kpi.short.reasoning" = "Reasoning";
+"kpi.short.cacheRead" = "Cache R";
+"kpi.short.cacheWrite" = "Cache W";
+"kpi.short.avgPerSession" = "Avg/Session";
+
+// MARK: - Chart Titles
+"chart.tokens" = "Tokens";
+"chart.topProjects" = "Top 5 Projects";
+"chart.topModels" = "Top 5 Models";
+"chart.netCode" = "Net Code Lines";
+"chart.sessions" = "Sessions";
+"chart.history" = "History";
+"chart.tokenUsage" = "Token Usage";
+"chart.activity" = "Activity";
+"chart.consumptionEfficiency" = "Consumption & Efficiency";
+"chart.modelLens" = "Model Lens";
+"chart.userRhythm" = "User Rhythm";
+"chart.workIntensity" = "Work Intensity Distribution";
+"chart.intensity24h" = "24h Intensity Distribution";
+"chart.peak" = "Peak:";
+"chart.average" = "Average:";
+
+// MARK: - Chart Columns
+"chart.column.input" = "Input";
+"chart.column.output" = "Output";
+"chart.column.reasoning" = "Reasoning";
+"chart.column.netCode" = "Net Code";
+"chart.column.session" = "Session";
+"chart.column.message" = "Message";
+"chart.total" = "Total:";
+"chart.cumulative" = "Cumulative";
+"chart.delta" = "Delta";
+"chart.type" = "Chart Type";
+
+// MARK: - History
+"history.usage" = "Usage History";
+"history.activity" = "Activity History";
+"history.trend" = "Trend & Delta";
+"history.inputTokensCumulative" = "Input Tokens Cumulative";
+"history.messageDurationCumulative" = "Message Duration Cumulative";
+
+// MARK: - Time Range
+"time.today" = "Today";
+"time.yesterday" = "Yesterday";
+"time.thisWeek" = "This Week";
+"time.lastWeek" = "Last Week";
+"time.thisMonth" = "This Month";
+"time.lastMonth" = "Last Month";
+"time.thisYear" = "This Year";
+"time.all" = "All";
+"time.24hours" = "24 Hours";
+"time.30days" = "30 Days";
+"time.allTime" = "All Time";
+"time.todayShort" = "Today";
+"time.30daysShort" = "30 Days";
+"time.allTimeShort" = "All";
+
+// MARK: - Common
+"common.loading" = "Loading...";
+"common.noData" = "No Data";
+"common.noDataShort" = "No Data";
+"common.retry" = "Retry";
+"common.confirm" = "Confirm";
+"common.cancel" = "Cancel";
+"common.done" = "Done";
+"common.save" = "Save";
+"common.error" = "Error";
+"common.success" = "Success";
+"common.failed" = "Failed";
+"common.ok" = "OK";
+"common.yes" = "Yes";
+"common.no" = "No";
+"common.close" = "Close";
+"common.back" = "Back";
+"common.next" = "Next";
+"common.previous" = "Previous";
+
+// MARK: - Settings - Data Source
+"settings.data" = "Data";
+"settings.dataSource" = "Data Source";
+"settings.dataSourcePath" = "OpenCode Database Path";
+"settings.choosePath" = "Choose Path…";
+"settings.restoreDefault" = "Restore Default";
+"settings.defaultSource" = "Default Source:";
+"settings.confirmDataSource" = "Confirm Data Source";
+"settings.dataSourceHelp" = "Support selecting opencode.db file or directory containing it";
+"settings.choosePathHelp" = "Open file picker (show hidden files and directories)";
+"settings.restoreDefaultHelp" = "Restore to default path: ~/.local/share/opencode/opencode.db";
+
+// MARK: - Settings - Sync
+"settings.syncStrategy" = "Sync Strategy";
+"settings.syncStrategyHelp" = "Choose automatic monitoring or scheduled sync";
+"settings.sync.auto" = "Auto";
+"settings.sync.1min" = "1 Minute";
+"settings.sync.5min" = "5 Minutes";
+"settings.sync.10min" = "10 Minutes";
+"settings.sync.15min" = "15 Minutes";
+"settings.sync.autoDesc" = "Monitor data directory for changes and sync automatically";
+"settings.sync.intervalDesc" = "Scan and sync incrementally at set intervals (no file monitoring)";
+
+// MARK: - Settings - Backup
+"settings.backup" = "Backup";
+"settings.enableBackup" = "Enable Auto Backup";
+"settings.backupDescription" = "Regularly create automatic database backups to prevent data loss";
+"settings.backupRetention" = "Auto Backup Retention";
+"settings.backupRetentionHelp" = "Only applies to auto backups, oldest backups are cleaned up when limit exceeded";
+"settings.backupInterval" = "Backup Interval";
+"settings.backupNow" = "Backup Now (Manual)";
+"settings.backupNowHelp" = "Manual backups are not automatically cleaned up and can be deleted manually";
+"settings.backupList" = "Backup List";
+"settings.backup.createdAt" = "Created:";
+"settings.backup.size" = "Size:";
+"settings.backupIntervalHelp" = "Set the frequency of automatic backups";
+"settings.enableBackupHelp" = "Enable automatic database backups";
+"settings.backup.auto" = "Auto Backup";
+"settings.backup.manual" = "Manual Backup";
+"settings.backup.system" = "System Backup";
+"settings.backup.interval.6h" = "Every 6 Hours";
+"settings.backup.interval.12h" = "Every 12 Hours";
+"settings.backup.interval.24h" = "Every 24 Hours";
+"settings.backup.interval.48h" = "Every 48 Hours";
+"settings.restoreBackup" = "Restore Backup";
+"settings.deleteBackup" = "Delete Backup";
+"settings.confirmRestore" = "Confirm restore backup?";
+"settings.restoreWarning" = "Will overwrite current database, operation cannot be undone.";
+"settings.backupSuccess" = "Backup successful";
+"settings.backupFailed" = "Backup failed: ";
+"settings.restoreSuccess" = "Restore successful";
+"settings.restoreFailed" = "Restore failed: ";
+"settings.deleteSuccess" = "Delete successful";
+"settings.deleteFailed" = "Delete failed: ";
+"settings.backupNotInitialized" = "Backup manager not initialized";
+"settings.backup.kind.automatic" = "Automatic";
+"settings.backup.kind.manual" = "Manual";
+"settings.backup.kind.system" = "System";
+"settings.backup.kind.legacy" = "Legacy";
+
+// MARK: - Settings - Appearance
+"settings.general" = "General";
+"settings.appearance" = "Appearance";
+"settings.languages" = "Languages";
+"settings.theme" = "Theme";
+"settings.theme.system" = "System";
+"settings.theme.light" = "Light";
+"settings.theme.dark" = "Dark";
+"settings.themeHelp" = "Choose app theme mode: follow system or fixed light/dark";
+"settings.iconStyle" = "Icon Style";
+"settings.languageRestartHint" = "Restart app for language change to take effect";
+
+// MARK: - Settings - Log
+"settings.log" = "Log";
+"settings.logLevel" = "Log Level";
+"settings.logLevel.verbose" = "Verbose";
+"settings.logLevel.error" = "Error";
+"settings.logLevel.warn" = "Warning";
+"settings.logLevel.info" = "Info";
+"settings.logLevel.debug" = "Debug";
+"settings.logLevelDesc" = "Only output logs of this level or higher, for development debugging";
+
+// MARK: - Settings - Groups
+"settings.group.dataSync" = "Data Sync";
+"settings.group.backupRestore" = "Backup & Restore";
+"settings.group.appearance" = "Appearance";
+"settings.group.log" = "Log";
+
+// MARK: - Error Messages
+"error.loadFailed" = "Failed to load";
+"error.cannotLoadStats" = "Cannot load statistics";
+"error.confirmDataSource" = "Confirm Data Source";
+"error.invalidDataSource" = "Invalid data source";
+"error.dataSourceUnavailable" = "Data source path unavailable";
+"error.loadStats" = "Cannot load statistics";
+"error.failedToLoad" = "Failed to load statistics";
+
+// MARK: - Insights - Metrics
+"insight.inputTokens" = "Input Tokens";
+"insight.messages" = "Messages";
+"insight.cost" = "Cost";
+"insight.all" = "All";
+"insight.weekday" = "Weekday";
+"insight.weekend" = "Weekend";
+"insight.model" = "Model";
+"insight.provider" = "Provider";
+"insight.tps" = "TPS";
+"insight.input" = "Input";
+"insight.outputTPS" = "Output TPS";
+"insight.tpsCoverage" = "TPS Coverage";
+"insight.tpsCoverageWithData" = "TPS Coverage %d%% (based on valid completion time messages)";
+"insight.tpsCoverageAggregated" = "TPS Coverage -- (aggregated data)";
+
+// MARK: - Insights - Additional
+"insight.userRhythm" = "User Rhythm";
+"insight.workIntensity" = "Work Intensity Distribution";
+"insight.modelLens" = "Model Lens";
+"insight.24hIntensity" = "24h Intensity Distribution";
+"insight.noModelData" = "No model data";
+
+// MARK: - Insights - Filters
+"insight.filter.dayType" = "Day Type";
+"insight.filter.distribution" = "Distribution Metric";
+"insight.filter.dimension" = "Dimension";
+"insight.filter.heatmapMetric" = "Heatmap Metric";
+"insight.filter.metric.inputTokens" = "Input";
+"insight.filter.metric.messages" = "Messages";
+
+// MARK: - Insights - Enum Values
+"insight.metric.inputTokens" = "Input";
+"insight.metric.messages" = "Messages";
+"insight.metric.cost" = "Cost";
+"insight.dayType.all" = "All";
+"insight.dayType.weekdays" = "Workdays";
+"insight.dayType.weekends" = "Weekends";
+"insight.groupBy.model" = "Model";
+"insight.groupBy.provider" = "Provider";
+"insight.tpsCoverageBasedOn" = "Based on valid duration messages";
+
+// MARK: - Insights - Time Ranges
+"insight.recent365Days" = "Last 365 Days";
+"insight.little" = "Little";
+"insight.much" = "Much";
+
+// MARK: - Insights - Comparison
+"insight.weekdayVsWeekend" = "Weekday vs Weekend";
+"insight.weekdayTotal" = "Weekday ";
+"insight.weekendTotal" = "Weekend ";
+"insight.total" = "Total: ";
+
+// MARK: - Insights - Time Periods
+"insight.night" = "Night 0-8";
+"insight.daytime" = "Daytime 8-16";
+"insight.evening" = "Evening 16-24";
+
+// MARK: - Consumption Efficiency
+"consumption.consumptionAndEfficiency" = "Consumption & Efficiency";
+"consumption.cost" = "Cost";
+"consumption.input" = "Input";
+"consumption.output" = "Output";
+"consumption.reasoning" = "Reasoning";
+"consumption.perCodeLines" = "Per Code Line";
+"consumption.automationLevel" = "Automation Level";
+
+// MARK: - Session Depth
+"session.depth" = "Session Depth";
+"session.depth.shallow" = "Shallow";
+"session.depth.medium" = "Medium";
+"session.depth.deep" = "Deep";
+"session.depth.desc" = "Conversation turns: Shallow ≤5, Medium 6-15, Deep >15";
+"session.depth.range" = "≤5";
+"session.depth.rangeMedium" = "6-15";
+"session.depth.rangeDeep" = ">15";
+
+// MARK: - Code Impact
+"code.fileEdit" = "File Edit";
+"code.fileIncludeDoc" = "File includes code and documentation";
+"code.lines" = "Lines";
+"code.files" = "Files";
+"code.additions" = "Additions";
+"code.deletions" = "Deletions";
+"code.netCodeLines" = "Net Code Lines";
+
+// MARK: - Project Stats
+"project.projectList" = "Project List";
+"project.activeDays" = "Active Days";
+"project.activeDaysShort" = "active days";
+"project.activityOutput" = "Activity & Output";
+"project.netCodeLines" = "Net Code Lines";
+"project.totalDuration" = "Total Duration";
+"project.noProjectData" = "No project data";
+"project.importDataHint" = "Import OpenCode data to view project statistics";
+"project.activeDaysDesc" = "Count of days with activity";
+"project.lastActive" = "Last Active: ";
+"project.unknown" = "Unknown";
+"project.days" = "days";
+"project.hours" = "hours";
+"project.minutes" = "minutes";
+"project.seconds" = "seconds";
+"project.sessionCount" = "sessions";
+"project.messageCount" = "messages";
+"project.tokens" = "Tokens";
+"project.cost" = "Cost";
+"project.day" = "day";
+
+// MARK: - Top3 Metrics
+"top3.netCodeLines" = "Net Code";
+"top3.messages" = "Messages";
+"top3.totalDuration" = "Messages Duration";
+"top3.cost" = "Cost";
+
+// MARK: - Model & Agent
+"modelAndAgent.title" = "Models & Agents";
+"model.model" = "Model";
+"model.agent" = "Agent";
+"model.usageRatio" = "Usage Ratio";
+"model.noModelData" = "No model data";
+"model.dimension.model" = "Model";
+"model.dimension.provider" = "Provider";
+"model.noData" = "No data";
+"model.statDimension" = "Statistics Dimension";
+
+// MARK: - Menu Bar
+"menuBar.totalUsage" = "Usage: ";
+"menuBar.days" = "%d days";
+"menuBar.from" = "from";
+"menuBar.since" = "since";
+"menuBar.open" = "Open";
+"menuBar.quit" = "Quit";
+
+// Menu Bar - Main Menu
+"menu.about" = "About VibeWave";
+"menuBar.topModels" = "Top 5 Models";
+"menuBar.topProjects" = "Top 5 Projects";
+"menuBar.kpi.sessions" = "Sessions";
+"menuBar.kpi.messages" = "Messages";
+"menuBar.kpi.cost" = "Cost";
+"menuBar.kpi.input" = "Input";
+"menuBar.kpi.output" = "Output";
+"menuBar.kpi.reasoning" = "Reasoning";
+"menuBar.kpi.cacheRead" = "Cache R";
+"menuBar.kpi.cacheWrite" = "Cache W";
+"menuBar.kpi.avgPerSession" = "Avg/Session";
+
+// MARK: - Import
+"import.data" = "Import Data...";
+
+// MARK: - Languages
+"lang.en" = "English";
+"lang.zh_CN" = "Simplified Chinese";
+
+// MARK: - Chart Display
+"chart.separator" = "·";
+
+// MARK: - Aggregation Dimension
+"dimension.project" = "Project";
+"dimension.model" = "Model";
+
+// MARK: - About
+"about.tab" = "About";
+"about.version" = "Version";
+"about.build" = "Build";
+"about.copyright" = "Copyright";
+"about.developer" = "Developer";
+"about.github" = "GitHub";
+"about.twitter" = "Twitter / 𝕏";
+"about.description" = "A native Mac app for understanding your vibe coding flow.";
