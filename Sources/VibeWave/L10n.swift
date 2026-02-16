@@ -332,6 +332,7 @@ public enum L10n {
     public static var menuBarOpen: String { LocalizationManager.shared.localizedString("menuBar.open") }
     public static var menuBarQuit: String { LocalizationManager.shared.localizedString("menuBar.quit") }
     public static var menuAbout: String { LocalizationManager.shared.localizedString("menu.about") }
+    public static var menuCheckForUpdates: String { LocalizationManager.shared.localizedString("menu.checkForUpdates") }
     public static var menuBarTopModels: String { LocalizationManager.shared.localizedString("menuBar.topModels") }
     public static var menuBarTopProjects: String { LocalizationManager.shared.localizedString("menuBar.topProjects") }
     public static var menuBarKpiSessions: String { LocalizationManager.shared.localizedString("menuBar.kpi.sessions") }

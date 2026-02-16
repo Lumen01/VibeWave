@@ -339,6 +339,7 @@
 
 // Menu Bar - Main Menu
 "menu.about" = "关于 VibeWave";
+"menu.checkForUpdates" = "检查更新";
 "menuBar.topModels" = "Top 5 模型";
 "menuBar.topProjects" = "Top 5 项目";
 "menuBar.kpi.sessions" = "Sessions";

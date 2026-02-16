@@ -339,6 +339,7 @@
 
 // Menu Bar - Main Menu
 "menu.about" = "About VibeWave";
+"menu.checkForUpdates" = "Check for Updates";
 "menuBar.topModels" = "Top 5 Models";
 "menuBar.topProjects" = "Top 5 Projects";
 "menuBar.kpi.sessions" = "Sessions";
