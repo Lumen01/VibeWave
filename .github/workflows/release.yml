@@ -47,17 +47,24 @@ jobs:
         run: |
           chmod +x run-app.sh
           ./run-app.sh --build
+          ls -la .build/debug/
       
       - name: Package
         run: |
-          cd .build/debug
-          ditto -c -k --keepParent VibeWave.app ../../VibeWave-${{ steps.version.outputs.version }}.zip
+          APP_PATH=".build/debug/VibeWave.app"
+          if [ -d "$APP_PATH" ]; then
+            ditto -c -k --keepParent "$APP_PATH" "VibeWave-${{ steps.version.outputs.version }}.zip"
+            ls -la VibeWave-*.zip
+          else
+            echo "ERROR: App bundle not found at $APP_PATH"
+            exit 1
+          fi
       
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: VibeWave-${{ steps.version.outputs.version }}
-          path: VibeWave-*.zip
+          path: VibeWave-${{ steps.version.outputs.version }}.zip
       
       - name: Create Release
         if: github.ref_type == 'tag'
@@ -72,13 +79,13 @@ jobs:
             ---
 
             ### Download
-            - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VibeWave-${{ steps.version.outputs.version }}.zip)
+            - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VibeWave-${{ steps.version.outputs.version }}.zip)
 
             ### Install
             1. Download and extract ZIP
             2. Drag VibeWave.app to Applications folder
             3. First launch may require right-click and "Open"
-          files: VibeWave-*.zip
+          files: VibeWave-${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
