@@ -9,7 +9,7 @@ public struct SettingsView: View {
   @State private var showUpdateAlert = false
   @State private var latestRelease: GitHubRelease?
   
-  private enum UpdateCheckStatus {
+  private enum UpdateCheckStatus: Equatable {
     case idle
     case checking
     case upToDate
@@ -329,69 +329,12 @@ public struct SettingsView: View {
           .multilineTextAlignment(.center)
           .frame(maxWidth: 400)
         
-        VStack(spacing: 8) {
-          Button {
-            Task {
-              await checkForUpdates()
-            }
-          } label: {
-            HStack(spacing: 6) {
-              if updateCheckStatus == .checking {
-                ProgressView()
-                  .controlSize(.small)
-                  .scaleEffect(0.7)
-              } else {
-                Image(systemName: updateCheckStatus == .upToDate ? "checkmark.circle" : "arrow.down.circle")
-              }
-              Text(updateCheckButtonText)
-            }
-            .font(.callout)
-          }
-          .buttonStyle(.bordered)
-          .disabled(updateCheckStatus == .checking)
-          .alert("Update Available", isPresented: $showUpdateAlert, presenting: latestRelease) { release in
-            Button(L10n.aboutViewRelease) {
-              UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
-            }
-            Button(L10n.aboutLater, role: .cancel) {}
-          } message: { release in
-            Text("\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)")
-          }
-          
-          if case .error(let message) = updateCheckStatus {
-            Text(message)
-              .font(.caption)
-              .foregroundColor(.red)
-          } else if updateCheckStatus == .upToDate {
-            Text(L10n.aboutUpToDate)
-              .font(.caption)
-              .foregroundColor(.green)
-          }
-        }
+        aboutUpdateCheckView
         
         Divider()
           .frame(maxWidth: 400)
         
-        HStack(spacing: 12) {
-          Button {
-            AppConfiguration.Support.openGitHub()
-          } label: {
-            Label(L10n.aboutGitHub, systemImage: "link")
-              .font(.callout)
-          }
-          .buttonStyle(.link)
-
-          Text("|")
-            .foregroundColor(.secondary)
-
-          Button {
-            AppConfiguration.Support.openTwitter()
-          } label: {
-            Label(L10n.aboutTwitter, systemImage: "at")
-              .font(.callout)
-          }
-          .buttonStyle(.link)
-        }
+        aboutSocialLinksView
         
         Text(AppConfiguration.Developer.copyright)
           .font(.caption)
@@ -410,6 +353,92 @@ public struct SettingsView: View {
       Spacer()
     }
     .padding(.horizontal, 16)
+    .alert(isPresented: $showUpdateAlert) {
+      updateAvailableAlert
+    }
+  }
+
+  private var updateAvailableAlert: Alert {
+    guard let release = latestRelease else {
+      return Alert(title: Text("Update"))
+    }
+    return Alert(
+      title: Text("Update Available"),
+      message: Text("\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)"),
+      primaryButton: .default(Text(L10n.aboutViewRelease)) {
+        Task {
+          await UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
+        }
+      },
+      secondaryButton: .cancel(Text(L10n.aboutLater))
+    )
+  }
+  
+  private var aboutUpdateCheckView: some View {
+    VStack(spacing: 8) {
+      Button {
+        Task {
+          await checkForUpdates()
+        }
+      } label: {
+        aboutUpdateButtonLabel
+      }
+      .buttonStyle(.bordered)
+      .disabled(updateCheckStatus == .checking)
+      
+      aboutUpdateStatusView
+    }
+  }
+  
+  private var aboutUpdateButtonLabel: some View {
+    HStack(spacing: 6) {
+      if updateCheckStatus == .checking {
+        ProgressView()
+          .controlSize(.small)
+          .scaleEffect(0.7)
+      } else {
+        Image(systemName: updateCheckStatus == .upToDate ? "checkmark.circle" : "arrow.down.circle")
+      }
+      Text(updateCheckButtonText)
+    }
+    .font(.callout)
+  }
+  
+  private var aboutUpdateStatusView: some View {
+    Group {
+      if case .error(let message) = updateCheckStatus {
+        Text(message)
+          .font(.caption)
+          .foregroundColor(.red)
+      } else if updateCheckStatus == .upToDate {
+        Text(L10n.aboutUpToDate)
+          .font(.caption)
+          .foregroundColor(.green)
+      }
+    }
+  }
+  
+  private var aboutSocialLinksView: some View {
+    HStack(spacing: 12) {
+      Button {
+        AppConfiguration.Support.openGitHub()
+      } label: {
+        Label(L10n.aboutGitHub, systemImage: "link")
+          .font(.callout)
+      }
+      .buttonStyle(.link)
+
+      Text("|")
+        .foregroundColor(.secondary)
+
+      Button {
+        AppConfiguration.Support.openTwitter()
+      } label: {
+        Label(L10n.aboutTwitter, systemImage: "at")
+          .font(.callout)
+      }
+      .buttonStyle(.link)
+    }
   }
   
   private var aboutAppIcon: NSImage? {
