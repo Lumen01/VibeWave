@@ -13,7 +13,7 @@ public final class LocalizationManager: ObservableObject {
   }
   
   private let userDefaults = UserDefaults.standard
-  private let resourcesBundle = Bundle.module
+  private let resourcesBundle = ResourceBundleLocator.resourceBundle
   private var languageBundle: Bundle?
   
   public init() {

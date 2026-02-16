@@ -6,8 +6,8 @@ public struct SettingsView: View {
   @ObservedObject private var localizationManager = LocalizationManager.shared
   @State private var settingsRestoreCandidate: BackupInfo?
   @State private var updateCheckStatus: UpdateCheckStatus = .idle
-  @State private var showUpdateAlert = false
   @State private var latestRelease: GitHubRelease?
+  private let updateCheckWindowController = UpdateCheckWindowController()
   
   private enum UpdateCheckStatus: Equatable {
     case idle
@@ -353,25 +353,6 @@ public struct SettingsView: View {
       Spacer()
     }
     .padding(.horizontal, 16)
-    .alert(isPresented: $showUpdateAlert) {
-      updateAvailableAlert
-    }
-  }
-
-  private var updateAvailableAlert: Alert {
-    guard let release = latestRelease else {
-      return Alert(title: Text("Update"))
-    }
-    return Alert(
-      title: Text("Update Available"),
-      message: Text("\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)"),
-      primaryButton: .default(Text(L10n.aboutViewRelease)) {
-        Task {
-          await UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
-        }
-      },
-      secondaryButton: .cancel(Text(L10n.aboutLater))
-    )
   }
   
   private var aboutUpdateCheckView: some View {
@@ -410,10 +391,6 @@ public struct SettingsView: View {
         Text(message)
           .font(.caption)
           .foregroundColor(.red)
-      } else if updateCheckStatus == .upToDate {
-        Text(L10n.aboutUpToDate)
-          .font(.caption)
-          .foregroundColor(.green)
       }
     }
   }
@@ -442,7 +419,7 @@ public struct SettingsView: View {
   }
   
   private var aboutAppIcon: NSImage? {
-    Bundle.module.url(forResource: "VibeWave", withExtension: "icns")
+    ResourceBundleLocator.resourceBundle.url(forResource: "VibeWave", withExtension: "icns")
       .flatMap { NSImage(contentsOf: $0) }
   }
   
@@ -460,7 +437,9 @@ public struct SettingsView: View {
   }
   
   private func checkForUpdates() async {
-    updateCheckStatus = .checking
+    await MainActor.run {
+      updateCheckWindowController.show(status: .checking)
+    }
     
     let result = await UpdateCheckService.shared.checkForUpdates()
     
@@ -468,12 +447,15 @@ public struct SettingsView: View {
       switch result {
       case .upToDate:
         updateCheckStatus = .upToDate
+        updateCheckWindowController.show(status: .upToDate(version: AppConfiguration.App.version))
       case .newVersionAvailable(let release):
         latestRelease = release
-        showUpdateAlert = true
+        updateCheckWindowController.release = release
+        updateCheckWindowController.show(status: .newVersion(current: AppConfiguration.App.version, latest: release.version))
         updateCheckStatus = .idle
       case .error(let error):
         updateCheckStatus = .error(error.localizedDescription)
+        updateCheckWindowController.show(status: .error(error.localizedDescription))
       }
     }
   }

@@ -71,6 +71,16 @@ After first launch, configure the OpenCode data source path in Settings:
 3. Select the OpenCode data directory in "Data Sync" section
 4. Choose a sync strategy (Recommended: Automatic)
 
+### Troubleshooting
+
+If you see "VibeWave.app is damaged and cannot be opened" error after downloading:
+
+```bash
+xattr -d com.apple.quarantine VibeWave.app
+```
+
+Then try opening the app again.
+
 ---
 
 ## Contributing

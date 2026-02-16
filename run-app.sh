@@ -83,6 +83,22 @@ echo "📋 Copying executable..."
 cp "$BUILD_DIR/VibeWave" "$MACOS/$APP_NAME"
 chmod +x "$MACOS/$APP_NAME"
 
+echo "📋 Copying resource bundle..."
+RESOURCE_BUNDLE=""
+for dir in "$BUILD_DIR" "$SCRIPT_DIR/.build/arm64-apple-macosx/debug" "$SCRIPT_DIR/.build/x86_64-apple-macosx/debug"; do
+    if [[ -d "$dir/VibeWave_VibeWave.bundle" ]]; then
+        RESOURCE_BUNDLE="$dir/VibeWave_VibeWave.bundle"
+        break
+    fi
+done
+
+if [[ -n "$RESOURCE_BUNDLE" && -d "$RESOURCE_BUNDLE" ]]; then
+    cp -R "$RESOURCE_BUNDLE" "$CONTENTS/Resources/"
+    echo "✅ Copied resource bundle from $RESOURCE_BUNDLE"
+else
+    echo "⚠️  Warning: Resource bundle not found"
+fi
+
 if [[ -f "$ICON_SRC" ]]; then
     echo "🎨 Copying app icon..."
     cp "$ICON_SRC" "$CONTENTS/Resources/VibeWave.icns"
@@ -124,6 +140,17 @@ cat > "$CONTENTS/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+
+# ========== 代码签名 ==========
+echo "🔏 Code signing..."
+if [[ -n "$GITHUB_RUN_NUMBER" ]]; then
+    # CI 环境：使用 ad-hoc 签名
+    codesign --force --deep --sign - "$APP_BUNDLE"
+else
+    # 本地环境：使用 ad-hoc 签名
+    codesign --force --deep --sign - "$APP_BUNDLE"
+fi
+echo "✅ Code signed"
 
 # ========== 启动或仅构建 ==========
 case "$MODE" in

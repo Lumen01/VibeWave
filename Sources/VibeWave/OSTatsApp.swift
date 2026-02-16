@@ -6,6 +6,7 @@ public struct VibeWave: App {
     @ObservedObject var settingsViewModel = SettingsViewModel.shared
     @State private var databaseInitialized = false
     @State private var servicesStarted = false
+    private let updateCheckWindowController = UpdateCheckWindowController()
 
     public init() {
         // Single instance enforcement: Check if another instance is already running
@@ -51,52 +52,25 @@ public struct VibeWave: App {
     }
     
     private func checkForUpdates() async {
+        await MainActor.run {
+            updateCheckWindowController.show(status: .checking)
+        }
+        
         let result = await UpdateCheckService.shared.checkForUpdates()
         
         await MainActor.run {
             switch result {
             case .upToDate:
-                showUpToDateAlert()
-            case .newVersionAvailable(let release):
-                showUpdateAvailableAlert(release: release)
+                updateCheckWindowController.show(status: .upToDate(version: AppConfiguration.App.version))
+            case .newVersionAvailable(let newRelease):
+                updateCheckWindowController.release = newRelease
+                updateCheckWindowController.show(status: .newVersion(current: AppConfiguration.App.version, latest: newRelease.version))
             case .error(let error):
-                showUpdateErrorAlert(error: error)
+                updateCheckWindowController.show(status: .error(error.localizedDescription))
             }
         }
     }
     
-    private func showUpToDateAlert() {
-        let alert = NSAlert()
-        alert.messageText = AppConfiguration.App.name
-        alert.informativeText = L10n.aboutUpToDate
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-    
-    private func showUpdateAvailableAlert(release: GitHubRelease) {
-        let alert = NSAlert()
-        alert.messageText = L10n.aboutNewVersionAvailable
-        alert.informativeText = "\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)"
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: L10n.aboutViewRelease)
-        alert.addButton(withTitle: L10n.aboutLater)
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
-        }
-    }
-    
-    private func showUpdateErrorAlert(error: Error) {
-        let alert = NSAlert()
-        alert.messageText = AppConfiguration.App.name
-        alert.informativeText = "\(L10n.aboutUpdateError): \(error.localizedDescription)"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
     private func openAboutSettings() {
         NSApp.activate(ignoringOtherApps: true)
 

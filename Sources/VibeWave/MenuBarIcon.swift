@@ -5,12 +5,12 @@ internal enum MenuBarIcon {
     internal static let targetSize = NSSize(width: 18, height: 18)
 
     internal static let image: NSImage = {
-        if let url = Bundle.module.url(forResource: "menu-bar", withExtension: "png"),
+        if let url = ResourceBundleLocator.resourceBundle.url(forResource: "menu-bar", withExtension: "png"),
            let img = NSImage(contentsOf: url) {
             return img
         }
         
-        let baseImage = Bundle.module.url(forResource: "bar", withExtension: "png")
+        let baseImage = ResourceBundleLocator.resourceBundle.url(forResource: "bar", withExtension: "png")
             .flatMap { NSImage(contentsOf: $0) }
             ?? NSImage(systemSymbolName: "chart.bar.fill", accessibilityDescription: nil)
             ?? NSImage()

@@ -67,6 +67,16 @@ cd vibewave
 2. 点击 Settings 标签
 3. 选择同步策略（推荐：自动同步）
 
+### 故障排除
+
+下载应用后如果提示"VibeWave.app 已损坏，无法打开"：
+
+```bash
+xattr -d com.apple.quarantine VibeWave.app
+```
+
+然后再次尝试打开应用。
+
 ---
 
 ## 贡献指南
