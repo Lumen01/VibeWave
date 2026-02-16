@@ -19,18 +19,25 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Extract Version
+      - name: Extract Version and Tag Message
         id: version
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
+            # 读取标签附注消息
+            TAG_MESSAGE=$(git tag -l --format='%(contents)' ${GITHUB_REF#refs/tags/} 2>/dev/null || echo "")
           else
             git fetch --tags
             LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
             VERSION=${LATEST#v}
+            TAG_MESSAGE=""
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # 处理多行消息输出
+          echo "tag_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "📦 Building version: $VERSION"
       
       - name: Save Version
@@ -59,10 +66,14 @@ jobs:
           name: VibeWave ${{ steps.version.outputs.version }}
           body: |
             ## VibeWave ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
-            
+
+            ${{ steps.version.outputs.tag_message }}
+
+            ---
+
             ### Download
             - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VibeWave-${{ steps.version.outputs.version }}.zip)
-            
+
             ### Install
             1. Download and extract ZIP
             2. Drag VibeWave.app to Applications folder
