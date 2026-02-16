@@ -374,3 +374,14 @@
 "about.github" = "GitHub";
 "about.twitter" = "Twitter / 𝕏";
 "about.description" = "A native Mac app for understanding your vibe coding flow.";
+"about.checkForUpdates" = "Check for Updates";
+"about.checkingForUpdates" = "Checking...";
+"about.upToDate" = "You're up to date!";
+"about.newVersionAvailable" = "New version available";
+"about.currentVersion" = "Current:";
+"about.latestVersion" = "Latest:";
+"about.releaseNotes" = "Release Notes";
+"about.viewRelease" = "View Release";
+"about.download" = "Download";
+"about.later" = "Later";
+"about.updateError" = "Failed to check for updates";

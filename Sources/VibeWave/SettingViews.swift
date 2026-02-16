@@ -5,6 +5,16 @@ public struct SettingsView: View {
   @ObservedObject private var settingsViewModel = SettingsViewModel.shared
   @ObservedObject private var localizationManager = LocalizationManager.shared
   @State private var settingsRestoreCandidate: BackupInfo?
+  @State private var updateCheckStatus: UpdateCheckStatus = .idle
+  @State private var showUpdateAlert = false
+  @State private var latestRelease: GitHubRelease?
+  
+  private enum UpdateCheckStatus {
+    case idle
+    case checking
+    case upToDate
+    case error(String)
+  }
 
   private static let settingsDateFormatter: DateFormatter = {
     let formatter = DateFormatter()
@@ -309,7 +319,7 @@ public struct SettingsView: View {
         Text(AppConfiguration.App.name)
           .font(.system(size: 28, weight: .bold))
 
-        Text(L10n.aboutVersion + " " + AppConfiguration.App.version)
+        Text("\(L10n.aboutVersion) \(AppConfiguration.App.version) (Build: \(AppConfiguration.App.build))")
           .font(.system(size: 13))
           .foregroundColor(Color.secondary.opacity(0.6))
 
@@ -318,6 +328,46 @@ public struct SettingsView: View {
           .foregroundColor(Color.secondary.opacity(0.85))
           .multilineTextAlignment(.center)
           .frame(maxWidth: 400)
+        
+        VStack(spacing: 8) {
+          Button {
+            Task {
+              await checkForUpdates()
+            }
+          } label: {
+            HStack(spacing: 6) {
+              if updateCheckStatus == .checking {
+                ProgressView()
+                  .controlSize(.small)
+                  .scaleEffect(0.7)
+              } else {
+                Image(systemName: updateCheckStatus == .upToDate ? "checkmark.circle" : "arrow.down.circle")
+              }
+              Text(updateCheckButtonText)
+            }
+            .font(.callout)
+          }
+          .buttonStyle(.bordered)
+          .disabled(updateCheckStatus == .checking)
+          .alert("Update Available", isPresented: $showUpdateAlert, presenting: latestRelease) { release in
+            Button(L10n.aboutViewRelease) {
+              UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
+            }
+            Button(L10n.aboutLater, role: .cancel) {}
+          } message: { release in
+            Text("\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)")
+          }
+          
+          if case .error(let message) = updateCheckStatus {
+            Text(message)
+              .font(.caption)
+              .foregroundColor(.red)
+          } else if updateCheckStatus == .upToDate {
+            Text(L10n.aboutUpToDate)
+              .font(.caption)
+              .foregroundColor(.green)
+          }
+        }
         
         Divider()
           .frame(maxWidth: 400)
@@ -365,6 +415,38 @@ public struct SettingsView: View {
   private var aboutAppIcon: NSImage? {
     Bundle.module.url(forResource: "VibeWave", withExtension: "icns")
       .flatMap { NSImage(contentsOf: $0) }
+  }
+  
+  private var updateCheckButtonText: String {
+    switch updateCheckStatus {
+    case .idle:
+      return L10n.aboutCheckForUpdates
+    case .checking:
+      return L10n.aboutCheckingForUpdates
+    case .upToDate:
+      return L10n.aboutUpToDate
+    case .error:
+      return L10n.aboutCheckForUpdates
+    }
+  }
+  
+  private func checkForUpdates() async {
+    updateCheckStatus = .checking
+    
+    let result = await UpdateCheckService.shared.checkForUpdates()
+    
+    await MainActor.run {
+      switch result {
+      case .upToDate:
+        updateCheckStatus = .upToDate
+      case .newVersionAvailable(let release):
+        latestRelease = release
+        showUpdateAlert = true
+        updateCheckStatus = .idle
+      case .error(let error):
+        updateCheckStatus = .error(error.localizedDescription)
+      }
+    }
   }
   
   public var body: some View {
