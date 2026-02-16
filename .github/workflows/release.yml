@@ -68,24 +68,26 @@ jobs:
       
       - name: Create Release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v1
-        with:
-          name: VibeWave ${{ steps.version.outputs.version }}
-          body: |
-            ## VibeWave ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "VibeWave ${{ steps.version.outputs.version }}" \
+            --notes-file - << 'EOF'
+          ## VibeWave ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
 
-            ${{ steps.version.outputs.tag_message }}
+          ${{ steps.version.outputs.tag_message }}
 
-            ---
+          ---
 
-            ### Download
-            - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VibeWave-${{ steps.version.outputs.version }}.zip)
+          ### Download
+          - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VibeWave-${{ steps.version.outputs.version }}.zip)
 
-            ### Install
-            1. Download and extract ZIP
-            2. Drag VibeWave.app to Applications folder
-            3. First launch may require right-click and "Open"
-          files: VibeWave-${{ steps.version.outputs.version }}.zip
-          generate_release_notes: true
+          ### Install
+          1. Download and extract ZIP
+          2. Drag VibeWave.app to Applications folder
+          3. First launch may require right-click and "Open"
+          EOF
+          
+          # Upload asset
+          gh release upload "v${{ steps.version.outputs.version }}" "VibeWave-${{ steps.version.outputs.version }}.zip"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
