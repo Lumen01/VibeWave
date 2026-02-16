@@ -52,11 +52,14 @@ VibeWave provides a comprehensive set of features for tracking and analyzing Ope
 git clone https://github.com/lumenvibewave/vibewave.git
 cd vibewave
 
-# Build the project
-swift build
+# Build and run (default)
+./run-app.sh
 
-# Run the application
-swift run vibewave
+# Or build only
+./run-app.sh --build
+
+# Or build and run explicitly
+./run-app.sh --run
 ```
 
 ### Configuration

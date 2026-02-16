@@ -49,11 +49,14 @@ VibeWave 提供了一套完整的 OpenCode AI 使用统计和分析功能：
 git clone https://github.com/lumenvibewave/vibewave.git
 cd vibewave
 
-# 构建项目
-swift build
+# 构建并运行（默认）
+./run-app.sh
 
-# 运行应用
-swift run vibewave
+# 或仅构建
+./run-app.sh --build
+
+# 或显式构建并运行
+./run-app.sh --run
 ```
 
 ### 配置

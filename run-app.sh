@@ -18,24 +18,62 @@ ICON_SRC="$SCRIPT_DIR/art/VibeWave.icns"
 # Parse arguments
 MODE="${1:---run}"
 
-APP_CONFIG_FILE="$SCRIPT_DIR/Sources/VibeWave/AppConfiguration.swift"
+# ========== 版本号管理 ==========
+# 1. 尝试从 Git 标签获取版本（优先级最高）
+VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
 
-BUILD_NUMBER=$(grep -o 'buildNumber = [0-9]*' "$APP_CONFIG_FILE" | grep -o '[0-9]*')
-BUILD_NUMBER=$((BUILD_NUMBER + 1))
+# 2. 如果没有标签，从 VERSION 文件读取
+VERSION_FILE="$SCRIPT_DIR/.version"
+if [[ -z "$VERSION" && -f "$VERSION_FILE" ]]; then
+    VERSION=$(cat "$VERSION_FILE")
+fi
 
+# 3. 默认版本
+VERSION="${VERSION:-1.0.0}"
+
+# 保存版本到文件（供后续使用）
+echo "$VERSION" > "$VERSION_FILE"
+
+# ========== Build Number 管理 ==========
+BUILD_NUMBER_FILE="$SCRIPT_DIR/.build_number"
+if [[ -f "$BUILD_NUMBER_FILE" ]]; then
+    BUILD_NUMBER=$(cat "$BUILD_NUMBER_FILE")
+else
+    BUILD_NUMBER=0
+fi
+
+# CI 环境：使用 GitHub Run Number
+if [[ -n "$GITHUB_RUN_NUMBER" ]]; then
+    BUILD_NUMBER=$GITHUB_RUN_NUMBER
+# 本地环境：自动递增
+else
+    BUILD_NUMBER=$((BUILD_NUMBER + 1))
+fi
+
+echo "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
+
+# ========== 构建信息 ==========
 BUILD_DATE=$(date +"%Y-%m-%d %H:%M:%S")
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
+echo "📦 Version: $VERSION (Build $BUILD_NUMBER)"
+echo "🔨 Commit: $GIT_COMMIT"
+echo "📅 Date: $BUILD_DATE"
+
+# ========== 更新 AppConfiguration.swift ==========
+APP_CONFIG_FILE="$SCRIPT_DIR/Sources/VibeWave/AppConfiguration.swift"
 if [[ -f "$APP_CONFIG_FILE" ]]; then
-  sed -i '' "s/public static let buildNumber = [0-9]*/public static let buildNumber = $BUILD_NUMBER/" "$APP_CONFIG_FILE"
-  sed -i '' "s/public static let buildDate = \"[^\"]*\"/public static let buildDate = \"$BUILD_DATE\"/" "$APP_CONFIG_FILE"
-  sed -i '' "s/public static let gitCommit = \"[^\"]*\"/public static let gitCommit = \"$GIT_COMMIT\"/" "$APP_CONFIG_FILE"
-  echo "📊 Build #$BUILD_NUMBER ($GIT_COMMIT) on $BUILD_DATE"
+    sed -i '' "s/buildNumber = [0-9]*/buildNumber = $BUILD_NUMBER/" "$APP_CONFIG_FILE"
+    sed -i '' "s/buildDate = \"[^\"]*\"/buildDate = \"$BUILD_DATE\"/" "$APP_CONFIG_FILE"
+    sed -i '' "s/gitCommit = \"[^\"]*\"/gitCommit = \"$GIT_COMMIT\"/" "$APP_CONFIG_FILE"
+    echo "✅ Updated AppConfiguration.swift"
 fi
 
+# ========== 构建 Swift 项目 ==========
 echo "🏗️  Building VibeWave..."
 swift build
 
+# ========== 创建 .app Bundle ==========
 echo "📦 Creating .app bundle..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS"
@@ -46,12 +84,13 @@ cp "$BUILD_DIR/VibeWave" "$MACOS/$APP_NAME"
 chmod +x "$MACOS/$APP_NAME"
 
 if [[ -f "$ICON_SRC" ]]; then
-  echo "🎨 Copying app icon..."
-  cp "$ICON_SRC" "$CONTENTS/Resources/VibeWave.icns"
+    echo "🎨 Copying app icon..."
+    cp "$ICON_SRC" "$CONTENTS/Resources/VibeWave.icns"
 fi
 
-echo "⚙️  Creating Info.plist..."
-cat > "$CONTENTS/Info.plist" <<'EOF'
+# ========== 创建 Info.plist（包含版本号）==========
+echo "⚙️  Creating Info.plist with version $VERSION (build $BUILD_NUMBER)..."
+cat > "$CONTENTS/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -73,9 +112,9 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$BUILD_NUMBER</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>
@@ -86,9 +125,11 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
 </plist>
 EOF
 
+# ========== 启动或仅构建 ==========
 case "$MODE" in
   --build)
     echo "✅ Build complete!"
+    echo "   Version: $VERSION (Build $BUILD_NUMBER)"
     echo "   App bundle: $APP_BUNDLE"
     ;;
   --run|"")
