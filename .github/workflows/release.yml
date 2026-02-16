@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ github.run_number }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract Version
+        id: version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            git fetch --tags
+            LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION=${LATEST#v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "📦 Building version: $VERSION"
+      
+      - name: Save Version
+        run: echo "${{ steps.version.outputs.version }}" > .version
+      
+      - name: Build
+        run: |
+          chmod +x run-app.sh
+          ./run-app.sh --build
+      
+      - name: Package
+        run: |
+          cd .build/debug
+          ditto -c -k --keepParent VibeWave.app ../../VibeWave-${{ steps.version.outputs.version }}.zip
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeWave-${{ steps.version.outputs.version }}
+          path: VibeWave-*.zip
+      
+      - name: Create Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: VibeWave ${{ steps.version.outputs.version }}
+          body: |
+            ## VibeWave ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
+            
+            ### Download
+            - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VibeWave-${{ steps.version.outputs.version }}.zip)
+            
+            ### Install
+            1. Download and extract ZIP
+            2. Drag VibeWave.app to Applications folder
+            3. First launch may require right-click and "Open"
+          files: VibeWave-*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

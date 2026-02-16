@@ -14,9 +14,9 @@ public enum AppConfiguration {
     }
     
     public enum BuildInfo {
-        public static let buildNumber = 4
-        public static let buildDate = "2026-02-16 10:12:46"
-        public static let gitCommit = "d65076f"
+        public static let buildNumber = 8
+        public static let buildDate = "2026-02-16 11:42:51"
+        public static let gitCommit = "e81bdf2"
     }
     
     public enum Developer {

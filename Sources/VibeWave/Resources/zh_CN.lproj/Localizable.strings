@@ -339,6 +339,7 @@
 
 // Menu Bar - Main Menu
 "menu.about" = "关于 VibeWave";
+"menu.checkForUpdates" = "检查更新";
 "menuBar.topModels" = "Top 5 模型";
 "menuBar.topProjects" = "Top 5 项目";
 "menuBar.kpi.sessions" = "Sessions";
@@ -374,3 +375,14 @@
 "about.github" = "GitHub";
 "about.twitter" = "Twitter / 𝕏";
 "about.description" = "一款 macOS 原生应用，让你洞察自己的 Vibe Coding 节奏。";
+"about.checkForUpdates" = "检查更新";
+"about.checkingForUpdates" = "检查中...";
+"about.upToDate" = "当前已是最新版本";
+"about.newVersionAvailable" = "发现新版本";
+"about.currentVersion" = "当前版本:";
+"about.latestVersion" = "最新版本:";
+"about.releaseNotes" = "更新说明";
+"about.viewRelease" = "查看发布页";
+"about.download" = "立即下载";
+"about.later" = "稍后";
+"about.updateError" = "检查更新失败";

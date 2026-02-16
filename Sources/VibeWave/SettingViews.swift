@@ -5,6 +5,16 @@ public struct SettingsView: View {
   @ObservedObject private var settingsViewModel = SettingsViewModel.shared
   @ObservedObject private var localizationManager = LocalizationManager.shared
   @State private var settingsRestoreCandidate: BackupInfo?
+  @State private var updateCheckStatus: UpdateCheckStatus = .idle
+  @State private var showUpdateAlert = false
+  @State private var latestRelease: GitHubRelease?
+  
+  private enum UpdateCheckStatus: Equatable {
+    case idle
+    case checking
+    case upToDate
+    case error(String)
+  }
 
   private static let settingsDateFormatter: DateFormatter = {
     let formatter = DateFormatter()
@@ -309,7 +319,7 @@ public struct SettingsView: View {
         Text(AppConfiguration.App.name)
           .font(.system(size: 28, weight: .bold))
 
-        Text(L10n.aboutVersion + " " + AppConfiguration.App.version)
+        Text("\(L10n.aboutVersion) \(AppConfiguration.App.version) (Build: \(AppConfiguration.App.build))")
           .font(.system(size: 13))
           .foregroundColor(Color.secondary.opacity(0.6))
 
@@ -319,29 +329,12 @@ public struct SettingsView: View {
           .multilineTextAlignment(.center)
           .frame(maxWidth: 400)
         
+        aboutUpdateCheckView
+        
         Divider()
           .frame(maxWidth: 400)
         
-        HStack(spacing: 12) {
-          Button {
-            AppConfiguration.Support.openGitHub()
-          } label: {
-            Label(L10n.aboutGitHub, systemImage: "link")
-              .font(.callout)
-          }
-          .buttonStyle(.link)
-
-          Text("|")
-            .foregroundColor(.secondary)
-
-          Button {
-            AppConfiguration.Support.openTwitter()
-          } label: {
-            Label(L10n.aboutTwitter, systemImage: "at")
-              .font(.callout)
-          }
-          .buttonStyle(.link)
-        }
+        aboutSocialLinksView
         
         Text(AppConfiguration.Developer.copyright)
           .font(.caption)
@@ -360,11 +353,129 @@ public struct SettingsView: View {
       Spacer()
     }
     .padding(.horizontal, 16)
+    .alert(isPresented: $showUpdateAlert) {
+      updateAvailableAlert
+    }
+  }
+
+  private var updateAvailableAlert: Alert {
+    guard let release = latestRelease else {
+      return Alert(title: Text("Update"))
+    }
+    return Alert(
+      title: Text("Update Available"),
+      message: Text("\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)"),
+      primaryButton: .default(Text(L10n.aboutViewRelease)) {
+        Task {
+          await UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
+        }
+      },
+      secondaryButton: .cancel(Text(L10n.aboutLater))
+    )
+  }
+  
+  private var aboutUpdateCheckView: some View {
+    VStack(spacing: 8) {
+      Button {
+        Task {
+          await checkForUpdates()
+        }
+      } label: {
+        aboutUpdateButtonLabel
+      }
+      .buttonStyle(.bordered)
+      .disabled(updateCheckStatus == .checking)
+      
+      aboutUpdateStatusView
+    }
+  }
+  
+  private var aboutUpdateButtonLabel: some View {
+    HStack(spacing: 6) {
+      if updateCheckStatus == .checking {
+        ProgressView()
+          .controlSize(.small)
+          .scaleEffect(0.7)
+      } else {
+        Image(systemName: updateCheckStatus == .upToDate ? "checkmark.circle" : "arrow.down.circle")
+      }
+      Text(updateCheckButtonText)
+    }
+    .font(.callout)
+  }
+  
+  private var aboutUpdateStatusView: some View {
+    Group {
+      if case .error(let message) = updateCheckStatus {
+        Text(message)
+          .font(.caption)
+          .foregroundColor(.red)
+      } else if updateCheckStatus == .upToDate {
+        Text(L10n.aboutUpToDate)
+          .font(.caption)
+          .foregroundColor(.green)
+      }
+    }
+  }
+  
+  private var aboutSocialLinksView: some View {
+    HStack(spacing: 12) {
+      Button {
+        AppConfiguration.Support.openGitHub()
+      } label: {
+        Label(L10n.aboutGitHub, systemImage: "link")
+          .font(.callout)
+      }
+      .buttonStyle(.link)
+
+      Text("|")
+        .foregroundColor(.secondary)
+
+      Button {
+        AppConfiguration.Support.openTwitter()
+      } label: {
+        Label(L10n.aboutTwitter, systemImage: "at")
+          .font(.callout)
+      }
+      .buttonStyle(.link)
+    }
   }
   
   private var aboutAppIcon: NSImage? {
     Bundle.module.url(forResource: "VibeWave", withExtension: "icns")
       .flatMap { NSImage(contentsOf: $0) }
+  }
+  
+  private var updateCheckButtonText: String {
+    switch updateCheckStatus {
+    case .idle:
+      return L10n.aboutCheckForUpdates
+    case .checking:
+      return L10n.aboutCheckingForUpdates
+    case .upToDate:
+      return L10n.aboutUpToDate
+    case .error:
+      return L10n.aboutCheckForUpdates
+    }
+  }
+  
+  private func checkForUpdates() async {
+    updateCheckStatus = .checking
+    
+    let result = await UpdateCheckService.shared.checkForUpdates()
+    
+    await MainActor.run {
+      switch result {
+      case .upToDate:
+        updateCheckStatus = .upToDate
+      case .newVersionAvailable(let release):
+        latestRelease = release
+        showUpdateAlert = true
+        updateCheckStatus = .idle
+      case .error(let error):
+        updateCheckStatus = .error(error.localizedDescription)
+      }
+    }
   }
   
   public var body: some View {

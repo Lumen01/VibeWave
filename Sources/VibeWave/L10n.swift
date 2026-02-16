@@ -332,6 +332,7 @@ public enum L10n {
     public static var menuBarOpen: String { LocalizationManager.shared.localizedString("menuBar.open") }
     public static var menuBarQuit: String { LocalizationManager.shared.localizedString("menuBar.quit") }
     public static var menuAbout: String { LocalizationManager.shared.localizedString("menu.about") }
+    public static var menuCheckForUpdates: String { LocalizationManager.shared.localizedString("menu.checkForUpdates") }
     public static var menuBarTopModels: String { LocalizationManager.shared.localizedString("menuBar.topModels") }
     public static var menuBarTopProjects: String { LocalizationManager.shared.localizedString("menuBar.topProjects") }
     public static var menuBarKpiSessions: String { LocalizationManager.shared.localizedString("menuBar.kpi.sessions") }
@@ -360,4 +361,15 @@ public enum L10n {
     public static var aboutGitHub: String { LocalizationManager.shared.localizedString("about.github") }
     public static var aboutTwitter: String { LocalizationManager.shared.localizedString("about.twitter") }
     public static var aboutDescription: String { LocalizationManager.shared.localizedString("about.description") }
+    public static var aboutCheckForUpdates: String { LocalizationManager.shared.localizedString("about.checkForUpdates") }
+    public static var aboutCheckingForUpdates: String { LocalizationManager.shared.localizedString("about.checkingForUpdates") }
+    public static var aboutUpToDate: String { LocalizationManager.shared.localizedString("about.upToDate") }
+    public static var aboutNewVersionAvailable: String { LocalizationManager.shared.localizedString("about.newVersionAvailable") }
+    public static var aboutCurrentVersion: String { LocalizationManager.shared.localizedString("about.currentVersion") }
+    public static var aboutLatestVersion: String { LocalizationManager.shared.localizedString("about.latestVersion") }
+    public static var aboutReleaseNotes: String { LocalizationManager.shared.localizedString("about.releaseNotes") }
+    public static var aboutViewRelease: String { LocalizationManager.shared.localizedString("about.viewRelease") }
+    public static var aboutDownload: String { LocalizationManager.shared.localizedString("about.download") }
+    public static var aboutLater: String { LocalizationManager.shared.localizedString("about.later") }
+    public static var aboutUpdateError: String { LocalizationManager.shared.localizedString("about.updateError") }
 }

@@ -38,11 +38,63 @@ public struct VibeWave: App {
                 Button(L10n.menuAbout) {
                     self.openAboutSettings()
                 }
+                Button(L10n.menuCheckForUpdates) {
+                    Task {
+                        await self.checkForUpdates()
+                    }
+                }
             }
 
             CommandGroup(replacing: .help) {
             }
         }
+    }
+    
+    private func checkForUpdates() async {
+        let result = await UpdateCheckService.shared.checkForUpdates()
+        
+        await MainActor.run {
+            switch result {
+            case .upToDate:
+                showUpToDateAlert()
+            case .newVersionAvailable(let release):
+                showUpdateAvailableAlert(release: release)
+            case .error(let error):
+                showUpdateErrorAlert(error: error)
+            }
+        }
+    }
+    
+    private func showUpToDateAlert() {
+        let alert = NSAlert()
+        alert.messageText = AppConfiguration.App.name
+        alert.informativeText = L10n.aboutUpToDate
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    
+    private func showUpdateAvailableAlert(release: GitHubRelease) {
+        let alert = NSAlert()
+        alert.messageText = L10n.aboutNewVersionAvailable
+        alert.informativeText = "\(L10n.aboutCurrentVersion) \(AppConfiguration.App.version)\n\(L10n.aboutLatestVersion) \(release.version)\n\n\(release.body ?? L10n.aboutReleaseNotes)"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L10n.aboutViewRelease)
+        alert.addButton(withTitle: L10n.aboutLater)
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            UpdateCheckService.shared.openReleasePage(url: release.htmlUrl)
+        }
+    }
+    
+    private func showUpdateErrorAlert(error: Error) {
+        let alert = NSAlert()
+        alert.messageText = AppConfiguration.App.name
+        alert.informativeText = "\(L10n.aboutUpdateError): \(error.localizedDescription)"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func openAboutSettings() {

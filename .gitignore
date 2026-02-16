@@ -108,3 +108,9 @@ docs/design-**
 AGENT.md
 AGENTS.md
 CLAUDE.md
+
+# ==================== 版本管理文件 ====================
+# 本地版本号缓存（从 Git 标签或默认生成）
+.version
+# 本地 build 次数计数器（CI 使用 GITHUB_RUN_NUMBER）
+.build_number
