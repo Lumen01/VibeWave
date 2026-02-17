@@ -1,2 +1,6 @@
-# Exclude test directory from merges - keep tests in separate branch
+# Exclude agent/AI configuration from merges - keep in separate branch
 VibeWaveTests/ merge=ours
+.sisyphus/ merge=ours
+AGENT.md merge=ours
+AGENTS.md merge=ours
+CLAUD.md merge=ours
