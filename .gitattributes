@@ -1,0 +1,2 @@
+# Exclude test directory from merges - keep tests in separate branch
+VibeWaveTests/ merge=ours
