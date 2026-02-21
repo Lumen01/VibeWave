@@ -43,30 +43,35 @@ public struct ContentView: View {
           Label(L10n.navOverview, systemImage: "chart.bar.fill")
         }
         .tag(AppTab.usage)
+        .keyboardShortcut("1", modifiers: .command)
       
       ProjectsView(viewModel: projectsViewModel)
         .tabItem {
           Label(L10n.navProjects, systemImage: "folder.fill")
         }
         .tag(AppTab.projects)
+        .keyboardShortcut("2", modifiers: .command)
 
       InsightsView(viewModel: insightsViewModel)
         .tabItem {
           Label(L10n.navInsights, systemImage: "sparkles")
         }
         .tag(AppTab.insights)
+        .keyboardShortcut("3", modifiers: .command)
       
       HistoryView(viewModel: historyViewModel)
         .tabItem {
           Label(L10n.navHistory, systemImage: "clock.arrow.circlepath")
         }
         .tag(AppTab.history)
+        .keyboardShortcut("4", modifiers: .command)
       
       SettingsView()
         .tabItem {
           Label(L10n.navSettings, systemImage: "gearshape.fill")
         }
         .tag(AppTab.settings)
+        .keyboardShortcut("5", modifiers: .command)
     }
   }
 

@@ -70,6 +70,11 @@ public struct HistoryView: View {
                         Text(option.displayName)
                             .padding(.horizontal, ToolbarSegmentedControlStyle.segmentLabelHorizontalPadding)
                             .tag(option)
+                            .keyboardShortcut(
+                                option == .last24Hours ? "8" :
+                                option == .last30Days ? "9" : "0",
+                                modifiers: .command
+                            )
                     }
                 }
                 .pickerStyle(.segmented)

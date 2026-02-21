@@ -68,6 +68,11 @@ public struct OverviewView: View {
                 Text(option.displayName)
                     .padding(.horizontal, ToolbarSegmentedControlStyle.segmentLabelHorizontalPadding)
                     .tag(option)
+                    .keyboardShortcut(
+                        option == .today ? "8" :
+                        option == .last30Days ? "9" : "0",
+                        modifiers: .command
+                    )
             }
         }
         .pickerStyle(.segmented)
