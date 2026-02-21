@@ -20,27 +20,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
       
-      - name: Extract Version and Tag Message
+      - name: Extract Version and Tag Context
         id: version
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-            # 读取标签附注消息
-            TAG_MESSAGE=$(git tag -l --format='%(contents)' ${GITHUB_REF#refs/tags/} 2>/dev/null || echo "")
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG_NAME#v}"
           else
-            git fetch --tags
-            LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-            VERSION=${LATEST#v}
-            TAG_MESSAGE=""
+            git fetch --tags --force
+            TAG_NAME="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")"
+            VERSION="${TAG_NAME#v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # 处理多行消息输出
-          echo "tag_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "📦 Building version: $VERSION"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "📦 Building version: $VERSION from tag: $TAG_NAME"
       
       - name: Save Version
         run: echo "${{ steps.version.outputs.version }}" > .version
@@ -95,32 +92,57 @@ jobs:
       - name: Create Release
         if: github.ref_type == 'tag'
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          RELEASE_NOTES=$(cat << 'EOF'
-          ## VibeWave ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})
+          TAG="${{ steps.version.outputs.tag_name }}"
+          VERSION="${{ steps.version.outputs.version }}"
 
-          ${{ steps.version.outputs.tag_message }}
+          TAG_MESSAGE="$(git for-each-ref "refs/tags/$TAG" --format='%(contents)' 2>/dev/null || true)"
+          if [[ -z "${TAG_MESSAGE// /}" ]]; then
+            TAG_MESSAGE="No annotated tag notes found for $TAG."
+          fi
+
+          PREV_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
+          if [[ -n "$PREV_TAG" ]]; then
+            CHANGE_RANGE="${PREV_TAG}..${TAG}"
+            CHANGES="$(git log --no-merges --pretty='- %s (%h)' "$CHANGE_RANGE")"
+          else
+            CHANGE_RANGE="$TAG"
+            CHANGES="$(git log --no-merges --pretty='- %s (%h)' "$TAG")"
+          fi
+
+          if [[ -z "${CHANGES// /}" ]]; then
+            CHANGES="- No commit-level changes detected."
+          fi
+
+          cat > RELEASE_NOTES.md <<EOF
+          ## VibeWave ${VERSION} (Build ${{ github.run_number }})
+
+          ### Release Notes
+          ${TAG_MESSAGE}
+
+          ---
+
+          ### Changes (${CHANGE_RANGE})
+          ${CHANGES}
 
           ---
 
           ### Download
-          - 📦 [VibeWave-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/VibeWave-${{ steps.version.outputs.version }}.zip)
+          - 📦 [VibeWave-${VERSION}.zip](https://github.com/${{ github.repository }}/releases/download/${TAG}/VibeWave-${VERSION}.zip)
 
           ### Install
           1. Download and extract ZIP
           2. Drag VibeWave.app to Applications folder
           3. First launch may require right-click and "Open"
           EOF
-          )
           
           # Check if release exists, edit it; otherwise create new
           if gh release view "$TAG" &>/dev/null; then
-            gh release edit "$TAG" --title "VibeWave ${{ steps.version.outputs.version }}" --notes "$RELEASE_NOTES"
+            gh release edit "$TAG" --title "VibeWave ${VERSION}" --notes-file RELEASE_NOTES.md
           else
-            gh release create "$TAG" --title "VibeWave ${{ steps.version.outputs.version }}" --notes "$RELEASE_NOTES"
+            gh release create "$TAG" --title "VibeWave ${VERSION}" --notes-file RELEASE_NOTES.md
           fi
           
           # Upload asset (overwrite if exists)
-          gh release upload "$TAG" "VibeWave-${{ steps.version.outputs.version }}.zip" --clobber
+          gh release upload "$TAG" "VibeWave-${VERSION}.zip" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
