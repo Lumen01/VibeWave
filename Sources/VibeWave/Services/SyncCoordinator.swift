@@ -617,4 +617,9 @@ extension Notification.Name {
     public static let backupSettingsDidChange = Notification.Name("backupSettingsDidChange")
     public static let backupDidUpdate = Notification.Name("backupDidUpdate")
     public static let showSettingsAbout = Notification.Name("showSettingsAbout")
+    public static let selectTabOverview = Notification.Name("selectTabOverview")
+    public static let selectTabProjects = Notification.Name("selectTabProjects")
+    public static let selectTabInsights = Notification.Name("selectTabInsights")
+    public static let selectTabHistory = Notification.Name("selectTabHistory")
+    public static let selectTabSettings = Notification.Name("selectTabSettings")
 }

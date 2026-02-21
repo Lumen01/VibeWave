@@ -19,6 +19,7 @@ public struct ProjectsView: View {
       Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.selectedProject)
     .navigationTitle(L10n.projectProjectList)
     .toolbar {
       ToolbarItem(placement: .navigation) {
@@ -37,27 +38,29 @@ public struct ProjectsView: View {
   }
 
   private var projectDetailView: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      if viewModel.selectedProject != nil {
-        ConsumptionEfficiencyView(
-          consumption: viewModel.projectConsumption,
-          automationLevel: viewModel.projectModelAgentStats?.automationLevel
-        )
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        if viewModel.selectedProject != nil {
+          ConsumptionEfficiencyView(
+            consumption: viewModel.projectConsumption,
+            automationLevel: viewModel.projectModelAgentStats?.automationLevel
+          )
 
-        ActivityOutputView(
-          activity: viewModel.projectActivity,
-          top3NetCodeLines: viewModel.top3NetCodeLines,
-          top3InputTokens: viewModel.top3InputTokens,
-          top3MessageCount: viewModel.top3MessageCount,
-          top3Duration: viewModel.top3Duration,
-          top3Cost: viewModel.top3Cost
-        )
+          ActivityOutputView(
+            activity: viewModel.projectActivity,
+            top3NetCodeLines: viewModel.top3NetCodeLines,
+            top3InputTokens: viewModel.top3InputTokens,
+            top3MessageCount: viewModel.top3MessageCount,
+            top3Duration: viewModel.top3Duration,
+            top3Cost: viewModel.top3Cost
+          )
 
-        ModelAgentView(modelAgentStats: viewModel.projectModelAgentStats)
+          ModelAgentView(modelAgentStats: viewModel.projectModelAgentStats)
+        }
       }
+      .padding(.horizontal, 16)
+      .padding(.top, 20)
     }
-    .padding(.horizontal, 16)
-    .padding(.top, 20)
   }
   
   private var projectsContent: some View {
@@ -80,7 +83,12 @@ public struct ProjectsView: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
     }
-    .frame(maxHeight: 240)
+    .frame(height: 240)
+    .layoutPriority(1)
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+    )
   }
   
   private func projectCard(_ stat: ProjectsViewModel.ProjectStats) -> some View {

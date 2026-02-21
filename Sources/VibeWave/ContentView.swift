@@ -81,5 +81,20 @@ public struct ContentView: View {
     .onReceive(NotificationCenter.default.publisher(for: .showSettingsAbout)) { _ in
       selectedTab = .settings
     }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabOverview)) { _ in
+      selectedTab = .usage
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabProjects)) { _ in
+      selectedTab = .projects
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabInsights)) { _ in
+      selectedTab = .insights
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabHistory)) { _ in
+      selectedTab = .history
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabSettings)) { _ in
+      selectedTab = .settings
+    }
   }
 }
