@@ -24,7 +24,7 @@ public final class ProjectsViewModel: ObservableObject {
   private var isVisible: Bool = false
   private var needsRefreshOnNextAppear: Bool = false
   
-  public struct ProjectStats: Identifiable {
+  public struct ProjectStats: Identifiable, Equatable {
     public let id = UUID()
     public let projectRoot: String
     public let sessionCount: Int
@@ -54,6 +54,10 @@ public final class ProjectsViewModel: ObservableObject {
       self.cost = cost
       self.activeDays = activeDays
       self.lastActiveAt = lastActiveAt
+    }
+    
+    public static func == (lhs: ProjectStats, rhs: ProjectStats) -> Bool {
+      lhs.id == rhs.id
     }
   }
   
