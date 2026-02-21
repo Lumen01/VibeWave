@@ -5,9 +5,6 @@ import GRDB
 public class DatabaseRepositoryTests: XCTestCase {
     public override func setUp() {
         super.setUp()
-        // Reset version tracking for predictable tests
-        UserDefaults.standard.removeObject(forKey: DatabaseRepository.versionKey)
-        UserDefaults.standard.set(0, forKey: DatabaseRepository.versionKey)
     }
 
     public override func tearDown() {
@@ -27,20 +24,16 @@ public class DatabaseRepositoryTests: XCTestCase {
         XCTAssertTrue(exists, "messages and sessions tables should exist in in-memory DB")
     }
 
-    public func testFreshRunInMemoryMigrationCreatesTablesAndSetsVersion() throws {
-        UserDefaults.standard.set(0, forKey: DatabaseRepository.versionKey)
+    public func testFreshRunInMemoryCreateTablesCreatesExpectedCoreTables() throws {
         let queue = try DatabaseQueue(path: ":memory:")
         try queue.write { db in
             try DatabaseRepository.createTables(on: db)
         }
-        UserDefaults.standard.set(1, forKey: DatabaseRepository.versionKey)
-        let ver = UserDefaults.standard.integer(forKey: DatabaseRepository.versionKey)
-        XCTAssertEqual(ver, 1, "Version should be set to 1 after in-memory migration")
         let exists: Bool = try queue.read { db in
             let rows = try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('messages','sessions')")
             return Set(rows).count == 2
         }
-        XCTAssertTrue(exists, "Messages and sessions tables must exist after in-memory migration")
+        XCTAssertTrue(exists, "Messages and sessions tables must exist after createTables")
     }
 
     public func testHasAnyData_ReturnsFalseForEmptyDatabase() throws {
@@ -218,5 +211,97 @@ public class DatabaseRepositoryTests: XCTestCase {
             try Int.fetchOne(db, sql: "PRAGMA cache_size")
         }
         XCTAssertEqual(cacheSize, -20000)
+    }
+
+    public func testMessagesTokenColumnsAreInteger() throws {
+        let queue = try DatabaseQueue(path: ":memory:")
+        try queue.write { db in
+            try DatabaseRepository.createTables(on: db)
+        }
+
+        let columnTypes = try queue.read { db in
+            try Row.fetchAll(db, sql: "PRAGMA table_info(messages)")
+                .reduce(into: [String: String]()) { partialResult, row in
+                    let name = row["name"] as? String ?? ""
+                    let type = row["type"] as? String ?? ""
+                    partialResult[name] = type.uppercased()
+                }
+        }
+
+        XCTAssertEqual(columnTypes["token_input"], "INTEGER")
+        XCTAssertEqual(columnTypes["token_output"], "INTEGER")
+        XCTAssertEqual(columnTypes["token_reasoning"], "INTEGER")
+    }
+
+    public func testBootstrapSchemaCreatesCoreTablesFromEmptyDatabase() throws {
+        let queue = try DatabaseQueue(path: ":memory:")
+
+        try queue.write { db in
+            try DatabaseRepository.bootstrapSchema(on: db)
+        }
+
+        let tableNames = try queue.read { db in
+            try Set(String.fetchAll(
+                db,
+                sql: "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('messages', 'sessions', 'sync_metadata', 'hourly_stats', 'daily_stats', 'monthly_stats')"
+            ))
+        }
+
+        XCTAssertEqual(tableNames, Set(["messages", "sessions", "sync_metadata", "hourly_stats", "daily_stats", "monthly_stats"]))
+    }
+
+    public func testBootstrapSchemaMigratesLegacyTokenColumnsAndDropsMigrationsTable() throws {
+        let queue = try DatabaseQueue(path: ":memory:")
+        try queue.write { db in
+            try db.execute(sql: """
+              CREATE TABLE messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT,
+                token_input TEXT,
+                token_output TEXT,
+                token_reasoning TEXT
+              )
+            """)
+            try db.execute(sql: """
+              INSERT INTO messages (id, session_id, token_input, token_output, token_reasoning)
+              VALUES ('m1', 's1', '10', '20', '30')
+            """)
+            try db.execute(sql: "CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)")
+        }
+
+        try queue.write { db in
+            try DatabaseRepository.bootstrapSchema(on: db)
+        }
+
+        let columnTypes = try queue.read { db in
+            try Row.fetchAll(db, sql: "PRAGMA table_info(messages)")
+                .reduce(into: [String: String]()) { partialResult, row in
+                    let name = row["name"] as? String ?? ""
+                    let type = row["type"] as? String ?? ""
+                    partialResult[name] = type.uppercased()
+                }
+        }
+        XCTAssertEqual(columnTypes["token_input"], "INTEGER")
+        XCTAssertEqual(columnTypes["token_output"], "INTEGER")
+        XCTAssertEqual(columnTypes["token_reasoning"], "INTEGER")
+
+        let migratedValues = try queue.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT token_input, token_output, token_reasoning FROM messages WHERE id = 'm1'"
+            )
+        }
+        XCTAssertEqual(migratedValues?["token_input"] as? Int64, 10)
+        XCTAssertEqual(migratedValues?["token_output"] as? Int64, 20)
+        XCTAssertEqual(migratedValues?["token_reasoning"] as? Int64, 30)
+
+        let migrationTableCount = try queue.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='grdb_migrations'"
+            ) ?? 0
+        }
+
+        XCTAssertEqual(migrationTableCount, 0)
     }
 }
