@@ -17,9 +17,9 @@ public struct MessageRecord: TableRecord {
     var variant: String?
     var projectRoot: String?
     var projectCwd: String?
-    var tokenInput: String?
-    var tokenOutput: String?
-    var tokenReasoning: String?
+    var tokenInput: Int?
+    var tokenOutput: Int?
+    var tokenReasoning: Int?
     var cacheRead: Int
     var cacheWrite: Int
     var cost: Double
@@ -70,16 +70,16 @@ public struct MessageRecord: TableRecord {
         self.variant = row[Columns.variant] as String?
         self.projectRoot = row[Columns.projectRoot] as String?
         self.projectCwd = row[Columns.projectCwd] as String?
-        self.tokenInput = row[Columns.tokenInput] as String?
-        self.tokenOutput = row[Columns.tokenOutput] as String?
-        self.tokenReasoning = row[Columns.tokenReasoning] as String?
-        self.cacheRead = row[Columns.cacheRead] as Int
-        self.cacheWrite = row[Columns.cacheWrite] as Int
-        self.cost = row[Columns.cost] as Double
+        self.tokenInput = Self.intValue(from: row, column: Columns.tokenInput)
+        self.tokenOutput = Self.intValue(from: row, column: Columns.tokenOutput)
+        self.tokenReasoning = Self.intValue(from: row, column: Columns.tokenReasoning)
+        self.cacheRead = Self.intValue(from: row, column: Columns.cacheRead) ?? 0
+        self.cacheWrite = Self.intValue(from: row, column: Columns.cacheWrite) ?? 0
+        self.cost = Self.doubleValue(from: row, column: Columns.cost) ?? 0.0
         self.summaryTitle = row[Columns.summaryTitle] as String?
-        self.summaryTotalAdditions = row[Columns.summaryTotalAdditions] as Int
-        self.summaryTotalDeletions = row[Columns.summaryTotalDeletions] as Int
-        self.summaryFileCount = row[Columns.summaryFileCount] as Int
+        self.summaryTotalAdditions = Self.intValue(from: row, column: Columns.summaryTotalAdditions) ?? 0
+        self.summaryTotalDeletions = Self.intValue(from: row, column: Columns.summaryTotalDeletions) ?? 0
+        self.summaryFileCount = Self.intValue(from: row, column: Columns.summaryFileCount) ?? 0
         self.finish = row[Columns.finish] as String?
         self.diffFiles = row[Columns.diffFiles] as String?
     }
@@ -131,21 +131,9 @@ public struct MessageRecord: TableRecord {
         self.variant = message.variant
         self.projectRoot = message.root
         self.projectCwd = message.cwd
-        if let inVal = message.tokens?.input {
-            self.tokenInput = String(inVal)
-        } else {
-            self.tokenInput = nil
-        }
-        if let outVal = message.tokens?.output {
-            self.tokenOutput = String(outVal)
-        } else {
-            self.tokenOutput = nil
-        }
-        if let reasonVal = message.tokens?.reasoning {
-            self.tokenReasoning = String(reasonVal)
-        } else {
-            self.tokenReasoning = nil
-        }
+        self.tokenInput = message.tokens?.input
+        self.tokenOutput = message.tokens?.output
+        self.tokenReasoning = message.tokens?.reasoning
         let cr: Int = message.tokens?.cacheRead ?? 0
         let cw: Int = message.tokens?.cacheWrite ?? 0
         self.cacheRead = cr
@@ -172,6 +160,38 @@ public struct MessageRecord: TableRecord {
         }
 
         self.finish = message.finish
+    }
+
+    private static func intValue(from row: Row, column: Column) -> Int? {
+        if let value = row[column] as Int? {
+            return value
+        }
+        if let value = row[column] as Int64? {
+            return Int(value)
+        }
+        if let value = row[column] as Double? {
+            return Int(value)
+        }
+        if let value = row[column] as String? {
+            return Int(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+
+    private static func doubleValue(from row: Row, column: Column) -> Double? {
+        if let value = row[column] as Double? {
+            return value
+        }
+        if let value = row[column] as Int? {
+            return Double(value)
+        }
+        if let value = row[column] as Int64? {
+            return Double(value)
+        }
+        if let value = row[column] as String? {
+            return Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
     }
 }
 

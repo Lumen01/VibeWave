@@ -188,7 +188,7 @@ final class OpenCodeDatabaseSyncServiceTests: XCTestCase {
 
         _ = try await service.syncDirectory(at: URL(fileURLWithPath: "/tmp"), toolId: "opencode")
 
-        try targetPool.write { db in
+        try await targetPool.write { db in
             try db.execute(
                 sql: """
                     UPDATE messages
