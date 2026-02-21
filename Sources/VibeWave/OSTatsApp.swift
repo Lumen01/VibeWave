@@ -32,6 +32,30 @@ public struct VibeWave: App {
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {
+                Button("Go to Overview") {
+                    NotificationCenter.default.post(name: .selectTabOverview, object: nil)
+                }
+                .keyboardShortcut("1", modifiers: .command)
+
+                Button("Go to Projects") {
+                    NotificationCenter.default.post(name: .selectTabProjects, object: nil)
+                }
+                .keyboardShortcut("2", modifiers: .command)
+
+                Button("Go to Insights") {
+                    NotificationCenter.default.post(name: .selectTabInsights, object: nil)
+                }
+                .keyboardShortcut("3", modifiers: .command)
+
+                Button("Go to History") {
+                    NotificationCenter.default.post(name: .selectTabHistory, object: nil)
+                }
+                .keyboardShortcut("4", modifiers: .command)
+
+                Button("Go to Settings") {
+                    NotificationCenter.default.post(name: .selectTabSettings, object: nil)
+                }
+                .keyboardShortcut("5", modifiers: .command)
             }
 
             CommandGroup(replacing: .appInfo) {

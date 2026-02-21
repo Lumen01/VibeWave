@@ -43,35 +43,30 @@ public struct ContentView: View {
           Label(L10n.navOverview, systemImage: "chart.bar.fill")
         }
         .tag(AppTab.usage)
-        .keyboardShortcut("1", modifiers: .command)
       
       ProjectsView(viewModel: projectsViewModel)
         .tabItem {
           Label(L10n.navProjects, systemImage: "folder.fill")
         }
         .tag(AppTab.projects)
-        .keyboardShortcut("2", modifiers: .command)
 
       InsightsView(viewModel: insightsViewModel)
         .tabItem {
           Label(L10n.navInsights, systemImage: "sparkles")
         }
         .tag(AppTab.insights)
-        .keyboardShortcut("3", modifiers: .command)
       
       HistoryView(viewModel: historyViewModel)
         .tabItem {
           Label(L10n.navHistory, systemImage: "clock.arrow.circlepath")
         }
         .tag(AppTab.history)
-        .keyboardShortcut("4", modifiers: .command)
       
       SettingsView()
         .tabItem {
           Label(L10n.navSettings, systemImage: "gearshape.fill")
         }
         .tag(AppTab.settings)
-        .keyboardShortcut("5", modifiers: .command)
     }
   }
 
@@ -84,6 +79,21 @@ public struct ContentView: View {
       }
     }
     .onReceive(NotificationCenter.default.publisher(for: .showSettingsAbout)) { _ in
+      selectedTab = .settings
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabOverview)) { _ in
+      selectedTab = .usage
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabProjects)) { _ in
+      selectedTab = .projects
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabInsights)) { _ in
+      selectedTab = .insights
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabHistory)) { _ in
+      selectedTab = .history
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .selectTabSettings)) { _ in
       selectedTab = .settings
     }
   }
