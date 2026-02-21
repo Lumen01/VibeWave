@@ -37,9 +37,9 @@ public final class MessageRepository {
                   variant TEXT,
                   project_root TEXT,
                   project_cwd TEXT,
-                  token_input TEXT,
-                  token_output TEXT,
-                  token_reasoning TEXT,
+                  token_input INTEGER,
+                  token_output INTEGER,
+                  token_reasoning INTEGER,
                   cache_read INTEGER,
                   cache_write INTEGER,
                   cost REAL,
@@ -48,7 +48,8 @@ public final class MessageRepository {
                   summary_total_deletions INTEGER,
                   summary_file_count INTEGER,
                   finish TEXT,
-                  diff_files TEXT
+                  diff_files TEXT,
+                  tool_id TEXT DEFAULT 'opencode'
                 )
                 """)
         }
