@@ -137,4 +137,68 @@ final class MessageParsingTests: XCTestCase {
         XCTAssertEqual(message.providerID, "nvidia")
         XCTAssertEqual(message.modelID, "z-ai/glm4.7")
     }
+
 }
+    func testMessageWithTopLevelCwdAndRoot_SnakeCase() throws {
+        // Test that Message can parse top-level cwd and root fields (snake_case format from OpenCode)
+        let json = """
+        {
+            "id": "msg_cwd_root_snake",
+            "session_id": "sess_cwd_test",
+            "role": "assistant",
+            "time": { "created": "2026-01-27T12:00:00Z" },
+            "cwd": "/Users/testuser/project",
+            "root": "/Users/testuser"
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let message = try decoder.decode(Message.self, from: data)
+        
+        XCTAssertEqual(message.cwd, "/Users/testuser/project")
+        XCTAssertEqual(message.root, "/Users/testuser")
+    }
+    
+    func testMessageWithTopLevelCwdAndRoot_CamelCase() throws {
+        // Test that Message can parse top-level cwd and root fields (camelCase format)
+        let json = """
+        {
+            "id": "msg_cwd_root_camel",
+            "sessionID": "sess_cwd_test_camel",
+            "role": "assistant",
+            "time": { "created": "2026-01-27T12:00:00Z" },
+            "cwd": "/Users/testuser/project",
+            "root": "/Users/testuser"
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let message = try decoder.decode(Message.self, from: data)
+        
+        XCTAssertEqual(message.cwd, "/Users/testuser/project")
+        XCTAssertEqual(message.root, "/Users/testuser")
+    }
+    
+    func testMessageWithNestedPathObject() throws {
+        // Test backward compatibility: nested path object format
+        let json = """
+        {
+            "id": "msg_path_nested",
+            "session_id": "sess_path_test",
+            "role": "assistant",
+            "time": { "created": "2026-01-27T12:00:00Z" },
+            "path": {
+                "cwd": "/workspace/app",
+                "root": "/workspace"
+            }
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let message = try decoder.decode(Message.self, from: data)
+        
+        XCTAssertEqual(message.cwd, "/workspace/app")
+        XCTAssertEqual(message.root, "/workspace")
+    }
+
+

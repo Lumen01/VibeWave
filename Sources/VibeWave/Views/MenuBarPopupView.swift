@@ -242,7 +242,7 @@ struct MenuBarPopupView: View {
                 .padding(.horizontal, 8)
 
             VStack(spacing: 0) {
-                ForEach(viewModel.topModels.prefix(11), id: \.modelId) { model in
+                ForEach(Array(viewModel.topModels.prefix(11)), id: \.uniqueId) { model in
                     ModelTableRow(model: model, viewModel: viewModel)
                 }
             }

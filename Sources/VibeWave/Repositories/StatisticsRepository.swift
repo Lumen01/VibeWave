@@ -138,7 +138,7 @@ public final class StatisticsRepository: @unchecked Sendable {
     }
   }
 
-  public struct ModelStats {
+  public struct ModelStats: Hashable {
     public var providerId: String
     public var modelId: String
     public var sessionCount: Int
@@ -150,6 +150,8 @@ public final class StatisticsRepository: @unchecked Sendable {
     public var cost: Double
     public var avgTokensPerMessage: Double
     public var avgCostPerMessage: Double
+
+    public var uniqueId: String { providerId + "-" + modelId }
 
     public init(providerId: String, modelId: String, sessionCount: Int, messageCount: Int, tokens: Int, inputTokens: Int, outputTokens: Int, reasoningTokens: Int, cost: Double, avgTokensPerMessage: Double, avgCostPerMessage: Double) {
       self.providerId = providerId

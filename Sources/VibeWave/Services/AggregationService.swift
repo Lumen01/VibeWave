@@ -163,7 +163,7 @@ private extension AggregationService {
         )
         SELECT
             (m.created_at / 3600000) * 3600000 as time_bucket_ms,
-            COALESCE(s.project_name, '未知项目') as project_id,
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目') as project_id,
             COALESCE(m.provider_id, 'unknown') as provider_id,
             COALESCE(m.model_id, 'unknown') as model_id,
             COALESCE(m.role, 'unknown') as role,
@@ -189,7 +189,7 @@ private extension AggregationService {
         WHERE m.created_at >= ? AND m.created_at < ?
         GROUP BY
             (m.created_at / 3600000) * 3600000,
-            COALESCE(s.project_name, '未知项目'),
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目'),
             COALESCE(m.provider_id, 'unknown'),
             COALESCE(m.model_id, 'unknown'),
             COALESCE(m.role, 'unknown'),
@@ -219,7 +219,7 @@ private extension AggregationService {
         )
         SELECT
             (m.created_at / 86400000) * 86400000 as time_bucket_ms,
-            COALESCE(s.project_name, '未知项目') as project_id,
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目') as project_id,
             COALESCE(m.provider_id, 'unknown') as provider_id,
             COALESCE(m.model_id, 'unknown') as model_id,
             COALESCE(m.role, 'unknown') as role,
@@ -245,7 +245,7 @@ private extension AggregationService {
         WHERE m.created_at >= ? AND m.created_at < ?
         GROUP BY
             (m.created_at / 86400000) * 86400000,
-            COALESCE(s.project_name, '未知项目'),
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目'),
             COALESCE(m.provider_id, 'unknown'),
             COALESCE(m.model_id, 'unknown'),
             COALESCE(m.role, 'unknown'),
@@ -275,7 +275,7 @@ private extension AggregationService {
         )
         SELECT
             CAST(strftime('%s', datetime(m.created_at / 1000, 'unixepoch', 'start of month')) as INTEGER) * 1000 as time_bucket_ms,
-            COALESCE(s.project_name, '未知项目') as project_id,
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目') as project_id,
             COALESCE(m.provider_id, 'unknown') as provider_id,
             COALESCE(m.model_id, 'unknown') as model_id,
             COALESCE(m.role, 'unknown') as role,
@@ -301,7 +301,7 @@ private extension AggregationService {
         WHERE m.created_at >= ? AND m.created_at < ?
         GROUP BY
             CAST(strftime('%s', datetime(m.created_at / 1000, 'unixepoch', 'start of month')) as INTEGER) * 1000,
-            COALESCE(s.project_name, '未知项目'),
+            COALESCE(NULLIF(s.project_name, ''), '未命名项目'),
             COALESCE(m.provider_id, 'unknown'),
             COALESCE(m.model_id, 'unknown'),
             COALESCE(m.role, 'unknown'),
