@@ -138,7 +138,6 @@ final class MessageParsingTests: XCTestCase {
         XCTAssertEqual(message.modelID, "z-ai/glm4.7")
     }
 
-}
     func testMessageWithTopLevelCwdAndRoot_SnakeCase() throws {
         // Test that Message can parse top-level cwd and root fields (snake_case format from OpenCode)
         let json = """
@@ -200,5 +199,5 @@ final class MessageParsingTests: XCTestCase {
         XCTAssertEqual(message.cwd, "/workspace/app")
         XCTAssertEqual(message.root, "/workspace")
     }
-
+}
 
