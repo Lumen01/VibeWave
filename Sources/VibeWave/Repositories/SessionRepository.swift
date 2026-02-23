@@ -41,7 +41,14 @@ public final class SessionRepository {
           SUM(m.summary_total_deletions),
           SUM(m.summary_file_count),
           SUM(m.summary_file_count),
-          (SELECT REPLACE(project_root, RTRIM(project_root, REPLACE(project_root, '/', '')), '')
+          (SELECT NULLIF(
+              REPLACE(
+                RTRIM(project_root, '/'),
+                RTRIM(RTRIM(project_root, '/'), REPLACE(RTRIM(project_root, '/'), '/', '')),
+                ''
+              ),
+              ''
+            )
            FROM messages m2
            WHERE m2.session_id = m.session_id AND m2.project_root IS NOT NULL
            LIMIT 1),
