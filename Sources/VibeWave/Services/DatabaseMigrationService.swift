@@ -47,9 +47,12 @@ public final class DatabaseMigrationService {
             try db.execute(sql: """
                 UPDATE sessions
                 SET project_name = (
-                    SELECT REPLACE(
-                        m2.project_root,
-                        RTRIM(m2.project_root, REPLACE(m2.project_root, '/', '')),
+                    SELECT NULLIF(
+                        REPLACE(
+                            RTRIM(m2.project_root, '/'),
+                            RTRIM(RTRIM(m2.project_root, '/'), REPLACE(RTRIM(m2.project_root, '/'), '/', '')),
+                            ''
+                        ),
                         ''
                     )
                     FROM messages m2
@@ -72,9 +75,12 @@ public final class DatabaseMigrationService {
             // 修复错误的 project_name（完整路径）
             try db.execute(sql: """
                 UPDATE sessions
-                SET project_name = REPLACE(
-                    project_name,
-                    RTRIM(project_name, REPLACE(project_name, '/', '')),
+                SET project_name = NULLIF(
+                    REPLACE(
+                        RTRIM(project_name, '/'),
+                        RTRIM(RTRIM(project_name, '/'), REPLACE(RTRIM(project_name, '/'), '/', '')),
+                        ''
+                    ),
                     ''
                 )
                 WHERE project_name LIKE '%/%' OR project_name LIKE '%\\%'
@@ -106,27 +112,39 @@ public final class DatabaseMigrationService {
             try db.execute(sql: """
                 UPDATE sessions
                 SET project_name = (
-                    SELECT REPLACE(
-                        COALESCE(
-                            NULLIF(m2.project_root, '/'),
-                            NULLIF(m2.project_root, ''),
-                            m2.project_cwd
-                        ),
-                        RTRIM(
-                            COALESCE(
-                                NULLIF(m2.project_root, '/'),
-                                NULLIF(m2.project_root, ''),
-                                m2.project_cwd
-                            ),
-                            REPLACE(
+                    SELECT NULLIF(
+                        REPLACE(
+                            RTRIM(
                                 COALESCE(
                                     NULLIF(m2.project_root, '/'),
                                     NULLIF(m2.project_root, ''),
                                     m2.project_cwd
                                 ),
-                                '/',
-                                ''
-                            )
+                                '/'
+                            ),
+                            RTRIM(
+                                RTRIM(
+                                    COALESCE(
+                                        NULLIF(m2.project_root, '/'),
+                                        NULLIF(m2.project_root, ''),
+                                        m2.project_cwd
+                                    ),
+                                    '/'
+                                ),
+                                REPLACE(
+                                    RTRIM(
+                                        COALESCE(
+                                            NULLIF(m2.project_root, '/'),
+                                            NULLIF(m2.project_root, ''),
+                                            m2.project_cwd
+                                        ),
+                                        '/'
+                                    ),
+                                    '/',
+                                    ''
+                                )
+                            ),
+                            ''
                         ),
                         ''
                     )
@@ -159,109 +177,10 @@ public final class DatabaseMigrationService {
     }
     
     // MARK: - Migration 3: 重新构建聚合数据
-    /// 使用修复后的 project_name 重新构建 hourly_stats 和 daily_stats
+    /// 使用修复后的 project_name 重新构建 hourly_stats、daily_stats 和 monthly_stats
     private func migrate3_rebuildAggregations() throws {
-        try dbPool.write { db in
-            logger.info("Migration 3: 开始重新构建聚合数据")
-            
-            // 删除旧的聚合数据
-            try db.execute(sql: "DELETE FROM hourly_stats")
-            try db.execute(sql: "DELETE FROM daily_stats")
-            try db.execute(sql: "DELETE FROM monthly_stats")
-            
-            // 获取时间范围
-            let timeRange = try Row.fetchOne(db, sql: """
-                SELECT MIN(created_at) as min_time, MAX(created_at) as max_time FROM messages
-            """)
-            guard let minTime = timeRange?["min_time"] as? Int64,
-                  let maxTime = timeRange?["max_time"] as? Int64 else {
-                logger.info("Migration 3: 没有消息数据，跳过聚合")
-                return
-            }
-            
-            // 重新聚合 hourly_stats
-            try db.execute(sql: """
-                INSERT INTO hourly_stats (
-                    time_bucket_ms, project_id, provider_id, model_id, role, agent, tool_id,
-                    session_count, message_count, input_tokens, output_tokens, reasoning_tokens,
-                    cache_read, cache_write, duration_ms, cost, net_code_lines, file_count,
-                    last_created_at_ms
-                )
-                SELECT
-                    (m.created_at / 3600000) * 3600000 as time_bucket_ms,
-                    COALESCE(NULLIF(s.project_name, ''), '未命名项目') as project_id,
-                    COALESCE(m.provider_id, 'unknown') as provider_id,
-                    COALESCE(m.model_id, 'unknown') as model_id,
-                    COALESCE(m.role, 'unknown') as role,
-                    COALESCE(m.agent, 'unknown') as agent,
-                    COALESCE(m.tool_id, 'opencode') as tool_id,
-                    COUNT(DISTINCT m.session_id) as session_count,
-                    COUNT(*) as message_count,
-                    COALESCE(SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)), 0) as input_tokens,
-                    COALESCE(SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)), 0) as output_tokens,
-                    COALESCE(SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)), 0) as reasoning_tokens,
-                    COALESCE(SUM(m.cache_read), 0) as cache_read,
-                    COALESCE(SUM(m.cache_write), 0) as cache_write,
-                    COALESCE(SUM(m.completed_at - m.created_at), 0) as duration_ms,
-                    COALESCE(SUM(m.cost), 0) as cost,
-                    COALESCE(SUM(COALESCE(m.summary_total_additions, 0) - COALESCE(m.summary_total_deletions, 0)), 0) as net_code_lines,
-                    COALESCE(SUM(COALESCE(m.summary_file_count, 0)), 0) as file_count,
-                    MAX(m.created_at) as last_created_at_ms
-                FROM messages m
-                LEFT JOIN sessions s ON m.session_id = s.session_id
-                WHERE m.created_at >= ? AND m.created_at < ?
-                GROUP BY
-                    (m.created_at / 3600000) * 3600000,
-                    COALESCE(NULLIF(s.project_name, ''), '未命名项目'),
-                    COALESCE(m.provider_id, 'unknown'),
-                    COALESCE(m.model_id, 'unknown'),
-                    COALESCE(m.role, 'unknown'),
-                    COALESCE(m.agent, 'unknown'),
-                    COALESCE(m.tool_id, 'opencode')
-            """, arguments: [minTime, maxTime + 3600000])
-            
-            // 重新聚合 daily_stats
-            try db.execute(sql: """
-                INSERT INTO daily_stats (
-                    time_bucket_ms, project_id, provider_id, model_id, role, agent, tool_id,
-                    session_count, message_count, input_tokens, output_tokens, reasoning_tokens,
-                    cache_read, cache_write, duration_ms, cost, net_code_lines, file_count,
-                    last_created_at_ms
-                )
-                SELECT
-                    (m.created_at / 86400000) * 86400000 as time_bucket_ms,
-                    COALESCE(NULLIF(s.project_name, ''), '未命名项目') as project_id,
-                    COALESCE(m.provider_id, 'unknown') as provider_id,
-                    COALESCE(m.model_id, 'unknown') as model_id,
-                    COALESCE(m.role, 'unknown') as role,
-                    COALESCE(m.agent, 'unknown') as agent,
-                    COALESCE(m.tool_id, 'opencode') as tool_id,
-                    COUNT(DISTINCT m.session_id) as session_count,
-                    COUNT(*) as message_count,
-                    COALESCE(SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)), 0) as input_tokens,
-                    COALESCE(SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)), 0) as output_tokens,
-                    COALESCE(SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)), 0) as reasoning_tokens,
-                    COALESCE(SUM(m.cache_read), 0) as cache_read,
-                    COALESCE(SUM(m.cache_write), 0) as cache_write,
-                    COALESCE(SUM(m.completed_at - m.created_at), 0) as duration_ms,
-                    COALESCE(SUM(m.cost), 0) as cost,
-                    COALESCE(SUM(COALESCE(m.summary_total_additions, 0) - COALESCE(m.summary_total_deletions, 0)), 0) as net_code_lines,
-                    COALESCE(SUM(COALESCE(m.summary_file_count, 0)), 0) as file_count,
-                    MAX(m.created_at) as last_created_at_ms
-                FROM messages m
-                LEFT JOIN sessions s ON m.session_id = s.session_id
-                WHERE m.created_at >= ? AND m.created_at < ?
-                GROUP BY
-                    (m.created_at / 86400000) * 86400000,
-                    COALESCE(NULLIF(s.project_name, ''), '未命名项目'),
-                    COALESCE(m.provider_id, 'unknown'),
-                    COALESCE(m.model_id, 'unknown'),
-                    COALESCE(m.role, 'unknown'),
-                    COALESCE(m.agent, 'unknown'),
-                    COALESCE(m.tool_id, 'opencode')
-            """, arguments: [minTime, maxTime + 86400000])
-            
-            logger.info("Migration 3: 聚合数据重建完成")
-        }
+        logger.info("Migration 3: 开始重新构建聚合数据")
+        try AggregationService(dbPool: dbPool).rebuildAllAggregations()
+        logger.info("Migration 3: 聚合数据重建完成")
     }
 }
