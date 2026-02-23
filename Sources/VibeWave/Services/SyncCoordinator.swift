@@ -245,14 +245,21 @@ func performInitialSync() {
                     logger.debug("Tool \(toolId) sync completed: \(progress.importedFiles) imported, \(progress.skippedFiles) skipped")
                     updateToolSyncState(toolId: toolId, error: nil)
 
+                    // 执行数据库迁移（修复 project_name 提取问题）
+                    do {
+                        let migrationService = DatabaseMigrationService(dbPool: DatabaseRepository.shared.dbPool())
+                        try migrationService.performMigrations()
+                        self.logger.info("数据库迁移完成")
+                    } catch {
+                        self.logger.error("数据库迁移失败：\(error)")
+                    }
                     // 聚合数据
                     if let aggregationService = self.aggregationService {
                         do {
                             try aggregationService.rebuildAllAggregations()
                             self.logger.info("数据聚合完成")
                         } catch {
-                            self.logger.error("数据聚合失败: \(error)")
-                            // 聚合失败不影响主流程，仅记录日志
+                            self.logger.error("数据聚合失败：\(error)")
                         }
                     }
                 } catch {

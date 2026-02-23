@@ -189,15 +189,19 @@ public struct OverviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    var topProjectsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            let projects = viewModel.topProjects.prefix(5)
-            let maxInput = projects.map { $0.inputTokens }.max() ?? 1
-            let maxNetCodeLines = projects.map { abs($0.netCodeLines) }.max() ?? 1
-            let maxSessions = projects.map { $0.sessionCount }.max() ?? 1
-            let maxMessages = projects.map { $0.messageCount }.max() ?? 1
-            let isEmpty = viewModel.topProjects.isEmpty
+    private var topProjectsData: (projects: [StatisticsRepository.ProjectStats], maxInput: Int, maxNetCodeLines: Int, maxSessions: Int, maxMessages: Int, isEmpty: Bool) {
+        let projects = Array(viewModel.topProjects.prefix(5))
+        let maxInput = projects.map { $0.inputTokens }.max() ?? 1
+        let maxNetCodeLines = projects.map { abs($0.netCodeLines) }.max() ?? 1
+        let maxSessions = projects.map { $0.sessionCount }.max() ?? 1
+        let maxMessages = projects.map { $0.messageCount }.max() ?? 1
+        let isEmpty = projects.isEmpty
+        return (projects, maxInput, maxNetCodeLines, maxSessions, maxMessages, isEmpty)
+    }
 
+    var topProjectsSection: some View {
+        let data = topProjectsData
+        return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 // 表头 - 始终显示
                 HStack(spacing: 0) {
@@ -227,7 +231,7 @@ public struct OverviewView: View {
 
                 // 数据行或占位行
                 VStack(alignment: .leading, spacing: 0) {
-                    if isEmpty {
+                    if data.isEmpty {
                         // 空数据时显示1行占位
                         HStack(spacing: 4) {
                             // 占位项目名称
@@ -245,7 +249,7 @@ public struct OverviewView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
                     } else {
-                        ForEach(Array(projects.enumerated()), id: \.element.id) { index, project in
+                        ForEach(Array(data.projects.enumerated()), id: \.element.id) { index, project in
                             VStack(spacing: 0) {
                                 HStack(spacing: 4) {
                                     // 项目名称
@@ -257,7 +261,7 @@ public struct OverviewView: View {
                                     // Input Tokens
                                     projectMetricBar(
                                         value: project.inputTokens,
-                                        maxValue: maxInput,
+                                        maxValue: data.maxInput,
                                         color: .blue,
                                         formatter: formatCompact
                                     )
@@ -265,7 +269,7 @@ public struct OverviewView: View {
                                     // 净增代码行
                                     projectMetricBar(
                                         value: abs(project.netCodeLines),
-                                        maxValue: maxNetCodeLines,
+                                        maxValue: data.maxNetCodeLines,
                                         color: .green,
                                         formatter: formatNetCodeLines
                                     )
@@ -273,7 +277,7 @@ public struct OverviewView: View {
                                     // 会话数
                                     projectMetricBar(
                                         value: project.sessionCount,
-                                        maxValue: maxSessions,
+                                        maxValue: data.maxSessions,
                                         color: .cyan,
                                         formatter: formatNumber
                                     )
@@ -281,7 +285,7 @@ public struct OverviewView: View {
                                     // 消息数
                                     projectMetricBar(
                                         value: project.messageCount,
-                                        maxValue: maxMessages,
+                                        maxValue: data.maxMessages,
                                         color: .purple,
                                         formatter: formatNumber
                                     )
@@ -289,7 +293,7 @@ public struct OverviewView: View {
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 6)
 
-                                if index < projects.count - 1 {
+                                if index < data.projects.count - 1 {
                                     Divider()
                                         .padding(.horizontal, 12)
                                 }
@@ -298,7 +302,7 @@ public struct OverviewView: View {
                     }
                 }
             }
-            .opacity(isEmpty ? 0.5 : 1.0)
+            .opacity(data.isEmpty ? 0.5 : 1.0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
@@ -410,123 +414,106 @@ public struct OverviewView: View {
         .frame(maxWidth: .infinity)
     }
 
-    var topModelsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            let models = viewModel.topModels.prefix(11)
-            let maxInput = models.map { $0.inputTokens }.max() ?? 1
-            let maxOutput = models.map { $0.outputTokens }.max() ?? 1
-            let maxReasoning = models.map { $0.reasoningTokens }.max() ?? 1
-            let maxMessages = models.map { $0.messageCount }.max() ?? 1
-            let isEmpty = viewModel.topModels.isEmpty
+    private var topModelsData: (models: [StatisticsRepository.ModelStats], maxInput: Int, maxOutput: Int, maxReasoning: Int, maxMessages: Int, isEmpty: Bool) {
+        let models = Array(viewModel.topModels.prefix(11))
+        let maxInput = models.map { $0.inputTokens }.max() ?? 1
+        let maxOutput = models.map { $0.outputTokens }.max() ?? 1
+        let maxReasoning = models.map { $0.reasoningTokens }.max() ?? 1
+        let maxMessages = models.map { $0.messageCount }.max() ?? 1
+        let isEmpty = models.isEmpty
+        return (models, maxInput, maxOutput, maxReasoning, maxMessages, isEmpty)
+    }
 
-            VStack(alignment: .leading, spacing: 0) {
-                // 表头 - 始终显示
-                HStack(spacing: 0) {
-                    Text(L10n.chartTopModels)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .frame(width: 100, alignment: .leading)
+    private var topModelsSectionHeader: some View {
+        HStack(spacing: 0) {
+            Text(L10n.chartTopModels)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .frame(width: 100, alignment: .leading)
 
-                    Spacer()
+            Spacer()
 
-                    modelHeaderCell(icon: "arrow.down", title: L10n.chartColumnInput, color: .blue)
-                        .padding(.leading, 4)
+            modelHeaderCell(icon: "arrow.down", title: L10n.chartColumnInput, color: .blue)
+                .padding(.leading, 4)
 
-                    modelHeaderCell(icon: "arrow.up", title: L10n.chartColumnOutput, color: .red)
-                        .padding(.leading, 4)
+            modelHeaderCell(icon: "arrow.up", title: L10n.chartColumnOutput, color: .red)
+                .padding(.leading, 4)
 
-                    modelHeaderCell(icon: "brain", title: L10n.chartColumnReasoning, color: .orange)
-                        .padding(.leading, 4)
+            modelHeaderCell(icon: "brain", title: L10n.chartColumnReasoning, color: .orange)
+                .padding(.leading, 4)
 
-                    modelHeaderCell(icon: "bubble.left", title: L10n.chartColumnMessage, color: .purple)
-                        .padding(.leading, 4)
+            modelHeaderCell(icon: "bubble.left", title: L10n.chartColumnMessage, color: .purple)
+                .padding(.leading, 4)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var topModelsSectionContent: some View {
+        let data = topModelsData
+        return VStack(alignment: .leading, spacing: 0) {
+            if data.isEmpty {
+                HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("-")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Text("-")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(width: 100, alignment: .leading)
+
+                    modelPlaceholderMetricBar()
+                    modelPlaceholderMetricBar()
+                    modelPlaceholderMetricBar()
+                    modelPlaceholderMetricBar()
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-
-                Divider()
-                    .padding(.horizontal, 12)
-
-                // 数据行或占位行
-                VStack(alignment: .leading, spacing: 0) {
-                    if isEmpty {
-                        // 空数据时显示1行占位
+                .padding(.vertical, 6)
+            } else {
+                ForEach(Array(data.models.enumerated()), id: \.element.uniqueId) { index, model in
+                    VStack(spacing: 0) {
                         HStack(spacing: 4) {
-                            // 占位模型名称和提供者
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("-")
+                                Text(model.modelId.components(separatedBy: "/").last ?? model.modelId)
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.secondary)
-                                Text("-")
+                                    .lineLimit(1)
+                                Text(model.providerId)
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
                             }
                             .frame(width: 100, alignment: .leading)
 
-                            // 占位指标
-                            modelPlaceholderMetricBar()
-                            modelPlaceholderMetricBar()
-                            modelPlaceholderMetricBar()
-                            modelPlaceholderMetricBar()
+                            modelMetricBar(value: model.inputTokens, maxValue: data.maxInput, color: .blue, formatter: formatCompact)
+                            modelMetricBar(value: model.outputTokens, maxValue: data.maxOutput, color: .red, formatter: formatCompact)
+                            modelMetricBar(value: model.reasoningTokens, maxValue: data.maxReasoning, color: .orange, formatter: formatCompact)
+                            modelMetricBar(value: model.messageCount, maxValue: data.maxMessages, color: .purple, formatter: formatNumber)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
-                    } else {
-                        ForEach(Array(models.enumerated()), id: \.element.modelId) { index, model in
-                            VStack(spacing: 0) {
-                                HStack(spacing: 4) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(model.modelId.components(separatedBy: "/").last ?? model.modelId)
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .lineLimit(1)
-                                        Text(model.providerId)
-                                            .font(.system(size: 10))
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                    .frame(width: 100, alignment: .leading)
 
-                                    modelMetricBar(
-                                        value: model.inputTokens,
-                                        maxValue: maxInput,
-                                        color: .blue,
-                                        formatter: formatCompact
-                                    )
-
-                                    modelMetricBar(
-                                        value: model.outputTokens,
-                                        maxValue: maxOutput,
-                                        color: .red,
-                                        formatter: formatCompact
-                                    )
-
-                                    modelMetricBar(
-                                        value: model.reasoningTokens,
-                                        maxValue: maxReasoning,
-                                        color: .orange,
-                                        formatter: formatCompact
-                                    )
-
-                                    modelMetricBar(
-                                        value: model.messageCount,
-                                        maxValue: maxMessages,
-                                        color: .purple,
-                                        formatter: formatNumber
-                                    )
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-
-                                if index < models.count - 1 {
-                                    Divider()
-                                        .padding(.horizontal, 12)
-                                }
-                            }
+                        if index < data.models.count - 1 {
+                            Divider()
+                                .padding(.horizontal, 12)
                         }
                     }
                 }
             }
-            .opacity(isEmpty ? 0.5 : 1.0)
+        }
+    }
+
+    var topModelsSection: some View {
+        let data = topModelsData
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                topModelsSectionHeader
+                Divider()
+                    .padding(.horizontal, 12)
+                topModelsSectionContent
+            }
+            .opacity(data.isEmpty ? 0.5 : 1.0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)

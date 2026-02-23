@@ -95,4 +95,30 @@ final class SessionRepositoryTests: XCTestCase {
     let depth = sessionRepo.getSessionDepth(sessionId: "sess1")
     XCTAssertEqual(depth, "shallow")
   }
+
+  func testCreateSessionsFromMessages_extractsProjectNameFromTrailingSlashRoot() throws {
+    let t = MessageTime(created: "2020-01-01T10:00:00Z", completed: nil)
+    let message = Message(
+      id: "m-trailing-slash",
+      sessionID: "sess-trailing",
+      role: "user",
+      time: t,
+      parentID: nil,
+      providerID: nil,
+      modelID: nil,
+      agent: nil,
+      mode: nil,
+      variant: nil,
+      cwd: "/Users/alice/MyApp/",
+      root: "/Users/alice/MyApp/",
+      tokens: Tokens(input: 1, output: 1, reasoning: 0),
+      cost: 0.0
+    )
+
+    try messageRepo.insert(message: message)
+    try sessionRepo.createSessionsFromMessages()
+
+    let session = sessionRepo.fetch(by: "sess-trailing")
+    XCTAssertEqual(session?.projectName, "MyApp")
+  }
 }

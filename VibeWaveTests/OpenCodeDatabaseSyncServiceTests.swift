@@ -204,4 +204,93 @@ final class OpenCodeDatabaseSyncServiceTests: XCTestCase {
         XCTAssertEqual(record?.providerId, "openai")
         XCTAssertEqual(record?.modelId, "gpt-4.1")
     }
+
+    func testSyncDirectory_ImportsCwdAndRootFields() async throws {
+        // Test that cwd and root fields are correctly imported from OpenCode message data
+        let sourceQueue = try DatabaseQueue(path: sourceDBPath)
+        try await sourceQueue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO message (id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    "msg_cwd_root",
+                    "session_cwd_root",
+                    1_771_057_700_000 as Int64,
+                    1_771_057_710_000 as Int64,
+                    """
+                    {"role":"assistant","time":{"created":1771057700000,"completed":1771057710000},"providerID":"openai","modelID":"gpt-4.1","cwd":"/Users/testuser/project","root":"/Users/testuser"}
+                    """
+                ]
+            )
+        }
+
+        _ = try await service.syncDirectory(at: URL(fileURLWithPath: "/tmp"), toolId: "opencode")
+
+        let record = messageRepo.fetch(by: "msg_cwd_root")
+        XCTAssertNotNil(record)
+        XCTAssertEqual(record?.projectCwd, "/Users/testuser/project")
+        XCTAssertEqual(record?.projectRoot, "/Users/testuser")
+    }
+
+    func testSyncDirectory_ImportsCwdAndRootFieldsSnakeCase() async throws {
+        // Test that cwd and root fields in snake_case format are correctly imported
+        let sourceQueue = try DatabaseQueue(path: sourceDBPath)
+        try await sourceQueue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO message (id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    "msg_cwd_root_snake",
+                    "session_cwd_root_snake",
+                    1_771_057_700_000 as Int64,
+                    1_771_057_710_000 as Int64,
+                    """
+                    {"role":"user","time":{"created":1771057700000},"provider_id":"openai","model_id":"gpt-4.1","cwd":"/workspace/app","root":"/workspace"}
+                    """
+                ]
+            )
+        }
+
+        _ = try await service.syncDirectory(at: URL(fileURLWithPath: "/tmp"), toolId: "opencode")
+
+        let record = messageRepo.fetch(by: "msg_cwd_root_snake")
+        XCTAssertNotNil(record)
+        XCTAssertEqual(record?.projectCwd, "/workspace/app")
+        XCTAssertEqual(record?.projectRoot, "/workspace")
+    }
+    
+    func testSyncDirectory_ImportsNestedPathObject() async throws {
+        // Test backward compatibility: nested path object format
+        let sourceQueue = try DatabaseQueue(path: sourceDBPath)
+        try await sourceQueue.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO message (id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    "msg_nested_path",
+                    "session_nested_path",
+                    1_771_057_700_000 as Int64,
+                    1_771_057_710_000 as Int64,
+                    """
+                    {"role":"assistant","time":{"created":1771057700000,"completed":1771057710000},"providerID":"openai","modelID":"gpt-4.1","path":{"cwd":"/nested/path","root":"/nested"}}
+                    """
+                ]
+            )
+        }
+
+        _ = try await service.syncDirectory(at: URL(fileURLWithPath: "/tmp"), toolId: "opencode")
+
+        let record = messageRepo.fetch(by: "msg_nested_path")
+        XCTAssertNotNil(record)
+        XCTAssertEqual(record?.projectCwd, "/nested/path")
+        XCTAssertEqual(record?.projectRoot, "/nested")
+    }
+
+
 }
