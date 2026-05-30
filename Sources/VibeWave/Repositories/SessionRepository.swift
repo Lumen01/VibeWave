@@ -12,6 +12,7 @@ public final class SessionRepository {
     try dbPool.write { db in
       try db.execute(sql: "DELETE FROM sessions")
 
+      // Insert sessions with raw project_root from messages
       try db.execute(sql: """
         INSERT INTO sessions (
             session_id, first_message_at, last_message_at, user_msg_count, agent_msg_count,
@@ -41,14 +42,7 @@ public final class SessionRepository {
           SUM(m.summary_total_deletions),
           SUM(m.summary_file_count),
           SUM(m.summary_file_count),
-          (SELECT NULLIF(
-              REPLACE(
-                RTRIM(project_root, '/'),
-                RTRIM(RTRIM(project_root, '/'), REPLACE(RTRIM(project_root, '/'), '/', '')),
-                ''
-              ),
-              ''
-            )
+          (SELECT m2.project_root
            FROM messages m2
            WHERE m2.session_id = m.session_id AND m2.project_root IS NOT NULL
            LIMIT 1),
@@ -61,9 +55,18 @@ public final class SessionRepository {
         GROUP BY m.session_id
       """)
 
-      let sessionRows = try Row.fetchAll(db, sql: "SELECT session_id FROM sessions")
+      // Extract project names correctly using Swift
+      let sessionRows = try Row.fetchAll(db, sql: "SELECT session_id, project_name FROM sessions")
       for row in sessionRows {
         guard let sessionId = row[0] as? String else { continue }
+
+        // Extract project name from the raw project_root path
+        if let projectRoot = row[1] as? String {
+          let projectName = PathHelper.extractProjectName(from: projectRoot)
+          try db.execute(sql: """
+            UPDATE sessions SET project_name = ? WHERE session_id = ?
+          """, arguments: [projectName, sessionId])
+        }
 
         let fileRows = try Row.fetchAll(db, sql: """
             SELECT diff_files FROM messages
