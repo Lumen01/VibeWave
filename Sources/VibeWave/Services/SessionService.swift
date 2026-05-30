@@ -11,11 +11,12 @@ public final class SessionService {
     public func recalculateSessions(for sessionIds: Set<String>) throws {
         guard !sessionIds.isEmpty else { return }
 
-        let sessionIdList = Array(sessionIds).joined(separator: "','")
-
         try dbPool.write { db in
-            try db.execute(sql: "DELETE FROM sessions WHERE session_id IN ('\(sessionIdList)')")
+            // Delete existing sessions for these IDs
+            let placeholders = sessionIds.map { _ in "?" }.joined(separator: ",")
+            try db.execute(sql: "DELETE FROM sessions WHERE session_id IN (\(placeholders))", arguments: StatementArguments(Array(sessionIds)))
 
+            // Insert sessions with raw project_root first
             try db.execute(sql: """
                 INSERT INTO sessions (
                     session_id, first_message_at, last_message_at, user_msg_count, agent_msg_count,
@@ -41,7 +42,7 @@ public final class SessionService {
                   SUM(m.summary_total_deletions),
                   SUM(m.summary_file_count),
                   SUM(m.summary_file_count),
-                  (SELECT SUBSTR(project_root, MAX(INSTR(project_root, '/'), INSTR(project_root, '\\\\')) + 1)
+                  (SELECT m2.project_root
                    FROM messages m2
                    WHERE m2.session_id = m.session_id AND m2.project_root IS NOT NULL
                    LIMIT 1),
@@ -51,9 +52,21 @@ public final class SessionService {
                    ORDER BY m3.created_at DESC
                    LIMIT 1)
                 FROM messages m
-                WHERE m.session_id IN ('\(sessionIdList)')
+                WHERE m.session_id IN (\(placeholders))
                 GROUP BY m.session_id
-            """)
+            """, arguments: StatementArguments(Array(sessionIds)))
+
+            // Extract project names correctly using Swift
+            let sessionRows = try Row.fetchAll(db, sql: "SELECT session_id, project_name FROM sessions WHERE session_id IN (\(placeholders))", arguments: StatementArguments(Array(sessionIds)))
+            for row in sessionRows {
+                guard let sessionId = row[0] as? String else { continue }
+                if let projectRoot = row[1] as? String {
+                    let projectName = PathHelper.extractProjectName(from: projectRoot)
+                    try db.execute(sql: """
+                        UPDATE sessions SET project_name = ? WHERE session_id = ?
+                    """, arguments: [projectName, sessionId])
+                }
+            }
 
             for sessionId in sessionIds {
                 let fileRows = try Row.fetchAll(db, sql: """
@@ -85,6 +98,7 @@ public final class SessionService {
         try dbPool.write { db in
             try db.execute(sql: "DELETE FROM sessions")
 
+            // Insert sessions with raw project_root first
             try db.execute(sql: """
                 INSERT INTO sessions (
                     session_id, first_message_at, last_message_at, user_msg_count, agent_msg_count,
@@ -110,7 +124,7 @@ public final class SessionService {
                   SUM(m.summary_total_deletions),
                   SUM(m.summary_file_count),
                   SUM(m.summary_file_count),
-                  (SELECT SUBSTR(project_root, MAX(INSTR(project_root, '/'), INSTR(project_root, '\\\\')) + 1)
+                  (SELECT m2.project_root
                    FROM messages m2
                    WHERE m2.session_id = m.session_id AND m2.project_root IS NOT NULL
                    LIMIT 1),
@@ -123,8 +137,21 @@ public final class SessionService {
                 GROUP BY m.session_id
             """)
 
-            let sessionRows = try Row.fetchAll(db, sql: "SELECT session_id FROM sessions")
+            // Extract project names correctly using Swift
+            let sessionRows = try Row.fetchAll(db, sql: "SELECT session_id, project_name FROM sessions")
             for row in sessionRows {
+                guard let sessionId = row[0] as? String else { continue }
+                if let projectRoot = row[1] as? String {
+                    let projectName = PathHelper.extractProjectName(from: projectRoot)
+                    try db.execute(sql: """
+                        UPDATE sessions SET project_name = ? WHERE session_id = ?
+                    """, arguments: [projectName, sessionId])
+                }
+            }
+
+            // Update file counts
+            let fileCountRows = try Row.fetchAll(db, sql: "SELECT session_id FROM sessions")
+            for row in fileCountRows {
                 guard let sessionId = row[0] as? String else { continue }
 
                 let fileRows = try Row.fetchAll(db, sql: """

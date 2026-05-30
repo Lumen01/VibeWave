@@ -22,69 +22,67 @@ public final class DatabaseMigrationService {
     }
     
     // MARK: - Migration 1: 修复 project_name 提取逻辑
-    /// 修复由于 SUBSTR/INSTR bug 导致的 project_name 提取错误
-    /// 问题：INSTR 只返回第一个 '/' 的位置，导致提取出完整路径而非项目名称
+    /// 修复由于 RTRIM bug 导致的 project_name 提取错误
+    /// 问题：RTRIM 移除字符集而非子串，导致提取出完整路径而非项目名称
     private func migrate1_fixProjectNameExtraction() throws {
         try dbPool.write { db in
             // 检查是否需要迁移
             let emptyProjectCount = try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM sessions WHERE project_name IS NULL OR project_name = ''
             """) ?? 0
-            
+
             let wrongProjectCount = try Int.fetchOne(db, sql: """
-                SELECT COUNT(*) FROM sessions 
+                SELECT COUNT(*) FROM sessions
                 WHERE project_name LIKE '%/%' OR project_name LIKE '%\\%'
             """) ?? 0
-            
+
             if emptyProjectCount == 0 && wrongProjectCount == 0 {
                 logger.info("Migration 1: 无需修复，project_name 数据正常")
                 return
             }
-            
+
             logger.info("Migration 1: 发现 \(emptyProjectCount) 个空 project_name, \(wrongProjectCount) 个错误 project_name")
-            
-            // 修复空的 project_name
-            try db.execute(sql: """
-                UPDATE sessions
-                SET project_name = (
-                    SELECT NULLIF(
-                        REPLACE(
-                            RTRIM(m2.project_root, '/'),
-                            RTRIM(RTRIM(m2.project_root, '/'), REPLACE(RTRIM(m2.project_root, '/'), '/', '')),
-                            ''
-                        ),
-                        ''
-                    )
+
+            // 修复空的 project_name - 使用 Swift 代码提取
+            let emptySessions = try Row.fetchAll(db, sql: """
+                SELECT session_id, (
+                    SELECT m2.project_root
                     FROM messages m2
                     WHERE m2.session_id = sessions.session_id
                       AND m2.project_root IS NOT NULL
                       AND m2.project_root != ''
                       AND m2.project_root != '/'
                     LIMIT 1
-                )
+                ) as project_root
+                FROM sessions
                 WHERE (project_name IS NULL OR project_name = '')
-                  AND EXISTS (
-                    SELECT 1 FROM messages m2
-                    WHERE m2.session_id = sessions.session_id
-                      AND m2.project_root IS NOT NULL
-                      AND m2.project_root != ''
-                      AND m2.project_root != '/'
-                  )
             """)
-            
-            // 修复错误的 project_name（完整路径）
-            try db.execute(sql: """
-                UPDATE sessions
-                SET project_name = NULLIF(
-                    REPLACE(
-                        RTRIM(project_name, '/'),
-                        RTRIM(RTRIM(project_name, '/'), REPLACE(RTRIM(project_name, '/'), '/', '')),
-                        ''
-                    ),
-                    ''
-                )
+
+            for row in emptySessions {
+                guard let sessionId = row["session_id"] as? String,
+                      let projectRoot = row["project_root"] as? String else { continue }
+                let projectName = PathHelper.extractProjectName(from: projectRoot)
+                try db.execute(sql: """
+                    UPDATE sessions SET project_name = ? WHERE session_id = ?
+                """, arguments: [projectName, sessionId])
+            }
+
+            // 修复错误的 project_name（完整路径）- 使用 Swift 代码提取
+            let wrongSessions = try Row.fetchAll(db, sql: """
+                SELECT session_id, project_name
+                FROM sessions
                 WHERE project_name LIKE '%/%' OR project_name LIKE '%\\%'
             """)
+
+            for row in wrongSessions {
+                guard let sessionId = row["session_id"] as? String,
+                      let projectName = row["project_name"] as? String else { continue }
+                let fixedName = PathHelper.extractProjectName(from: projectName)
+                try db.execute(sql: """
+                    UPDATE sessions SET project_name = ? WHERE session_id = ?
+                """, arguments: [fixedName, sessionId])
+            }
+
             let fixedCount = try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM sessions WHERE project_name IS NOT NULL AND project_name != '' AND project_name NOT LIKE '%/%'
             """) ?? 0
@@ -100,78 +98,51 @@ public final class DatabaseMigrationService {
             let emptyCount = try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM sessions WHERE project_name IS NULL OR project_name = ''
             """) ?? 0
-            
+
             if emptyCount == 0 {
                 logger.info("Migration 2: 无需修复，没有空 project_name")
                 return
             }
-            
+
             logger.info("Migration 2: 发现 \(emptyCount) 个空 project_name，尝试使用 project_cwd 修复")
-            
-            // 使用 project_cwd 作为后备
-            try db.execute(sql: """
-                UPDATE sessions
-                SET project_name = (
-                    SELECT NULLIF(
-                        REPLACE(
-                            RTRIM(
-                                COALESCE(
-                                    NULLIF(m2.project_root, '/'),
-                                    NULLIF(m2.project_root, ''),
-                                    m2.project_cwd
-                                ),
-                                '/'
-                            ),
-                            RTRIM(
-                                RTRIM(
-                                    COALESCE(
-                                        NULLIF(m2.project_root, '/'),
-                                        NULLIF(m2.project_root, ''),
-                                        m2.project_cwd
-                                    ),
-                                    '/'
-                                ),
-                                REPLACE(
-                                    RTRIM(
-                                        COALESCE(
-                                            NULLIF(m2.project_root, '/'),
-                                            NULLIF(m2.project_root, ''),
-                                            m2.project_cwd
-                                        ),
-                                        '/'
-                                    ),
-                                    '/',
-                                    ''
-                                )
-                            ),
-                            ''
-                        ),
-                        ''
+
+            // 使用 project_cwd 作为后备 - 使用 Swift 代码提取
+            let emptySessions = try Row.fetchAll(db, sql: """
+                SELECT session_id, (
+                    SELECT COALESCE(
+                        NULLIF(m2.project_root, '/'),
+                        NULLIF(m2.project_root, ''),
+                        m2.project_cwd
                     )
                     FROM messages m2
                     WHERE m2.session_id = sessions.session_id
                       AND (m2.project_root IS NOT NULL OR m2.project_cwd IS NOT NULL)
                     LIMIT 1
-                )
+                ) as project_path
+                FROM sessions
                 WHERE (project_name IS NULL OR project_name = '')
-                  AND EXISTS (
-                    SELECT 1 FROM messages m2
-                    WHERE m2.session_id = sessions.session_id
-                      AND (m2.project_root IS NOT NULL OR m2.project_cwd IS NOT NULL)
-                  )
             """)
-            
+
+            for row in emptySessions {
+                guard let sessionId = row["session_id"] as? String,
+                      let projectPath = row["project_path"] as? String else { continue }
+                let projectName = PathHelper.extractProjectName(from: projectPath)
+                try db.execute(sql: """
+                    UPDATE sessions SET project_name = ? WHERE session_id = ?
+                """, arguments: [projectName, sessionId])
+            }
+
             // 剩余的空值标记为"未命名项目"
             try db.execute(sql: """
                 UPDATE sessions
                 SET project_name = '未命名项目'
                 WHERE project_name IS NULL OR project_name = ''
             """)
-            
+
             let finalEmptyCount = try Int.fetchOne(db, sql: """
                 SELECT COUNT(*) FROM sessions WHERE project_name IS NULL OR project_name = ''
             """) ?? 0
-            
+
             logger.info("Migration 2: 修复完成，剩余 \(finalEmptyCount) 个空 project_name")
         }
     }
