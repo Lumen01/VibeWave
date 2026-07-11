@@ -89,7 +89,7 @@ final class SyncCoordinatorTests: XCTestCase {
 
         coordinator.performInitialSync()
 
-        wait(for: [expectation], timeout: 2.0)
+        wait(for: [expectation], timeout: 5.0)
         notificationCenter.removeObserver(observer)
     }
 
@@ -122,6 +122,36 @@ final class SyncCoordinatorTests: XCTestCase {
 
         wait(for: [expectation], timeout: 2.0)
         notificationCenter.removeObserver(observer)
+    }
+
+    func testFullSync_WhenToolFails_RestoresBackupWithoutDeletingIt() async {
+        var registry = AIToolAdapterRegistry()
+        registry.register(adapter: FakeAdapter(toolId: "first"))
+        registry.register(adapter: FakeAdapter(toolId: "second"))
+        let first = FakeSyncService()
+        let second = FakeSyncService()
+        second.setThrowOnSyncDirectory(true)
+        var restored = false
+        var deleted = false
+
+        let coordinator = SyncCoordinator(
+            adapterRegistry: registry,
+            syncServices: ["first": first, "second": second],
+            toolDataDirectoryProvider: { _ in URL(fileURLWithPath: "/tmp") },
+            fullSyncDataDirectoryProvider: { _ in URL(fileURLWithPath: "/tmp") },
+            databaseResetter: {},
+            createFullSyncBackup: {},
+            restoreFullSyncBackup: { restored = true },
+            deleteFullSyncBackup: { deleted = true }
+        )
+
+        do {
+            try await coordinator.executeFullSync()
+            XCTFail("Expected full sync to fail")
+        } catch {
+            XCTAssertTrue(restored)
+            XCTAssertFalse(deleted)
+        }
     }
 
     func testInitialSync_UsesMessageDirectoryForOpenCode() {

@@ -38,6 +38,10 @@ public final class SyncCoordinator: ObservableObject {
     private let toolDataDirectoryProvider: (String) -> URL
     private let fullSyncDataDirectoryProvider: (String) -> URL
     private let databaseResetter: () async throws -> Void
+    private let createFullSyncBackup: () async throws -> Void
+    private let restoreFullSyncBackup: () async throws -> Void
+    private let deleteFullSyncBackup: () async throws -> Void
+    private let rebuildFullSyncAggregations: () throws -> Void
     private let logger = AppLogger(category: "SyncCoordinator")
 
     private init() {
@@ -49,6 +53,24 @@ public final class SyncCoordinator: ObservableObject {
             backupDirectory: backupDirectory,
             additionalSearchDirectories: [legacyBackupDirectory]
         )
+        let manager = backupManager!
+        let pool = DatabaseRepository.shared.dbPool()
+        var fullSyncBackup: BackupInfo?
+        self.createFullSyncBackup = {
+            fullSyncBackup = try await manager.createBackup(from: pool, kind: .system)
+        }
+        self.restoreFullSyncBackup = {
+            guard let backup = fullSyncBackup else { return }
+            try await manager.restoreBackup(backup, to: pool)
+        }
+        self.deleteFullSyncBackup = {
+            guard let backup = fullSyncBackup else { return }
+            try await manager.deleteBackup(backup)
+            fullSyncBackup = nil
+        }
+        self.rebuildFullSyncAggregations = {
+            try AggregationService(dbPool: pool).rebuildAllAggregations()
+        }
 
         self.notificationCenter = .default
         self.fileWatcher = FileWatcher(flushInterval: 5.0)
@@ -108,6 +130,10 @@ public final class SyncCoordinator: ObservableObject {
         toolDataDirectoryProvider: @escaping (String) -> URL,
         fullSyncDataDirectoryProvider: @escaping (String) -> URL,
         databaseResetter: @escaping () async throws -> Void,
+        createFullSyncBackup: @escaping () async throws -> Void = {},
+        restoreFullSyncBackup: @escaping () async throws -> Void = {},
+        deleteFullSyncBackup: @escaping () async throws -> Void = {},
+        rebuildFullSyncAggregations: @escaping () throws -> Void = {},
         fileWatcher: FileWatching = FileWatcher(),
         scheduler: SyncScheduling = SyncScheduler(),
         syncStrategyProvider: @escaping () -> SyncStrategy = {
@@ -120,6 +146,10 @@ public final class SyncCoordinator: ObservableObject {
         self.toolDataDirectoryProvider = toolDataDirectoryProvider
         self.fullSyncDataDirectoryProvider = fullSyncDataDirectoryProvider
         self.databaseResetter = databaseResetter
+        self.createFullSyncBackup = createFullSyncBackup
+        self.restoreFullSyncBackup = restoreFullSyncBackup
+        self.deleteFullSyncBackup = deleteFullSyncBackup
+        self.rebuildFullSyncAggregations = rebuildFullSyncAggregations
         self.fileWatcher = fileWatcher
         self.scheduler = scheduler
         self.syncStrategyProvider = syncStrategyProvider
@@ -344,60 +374,9 @@ func performInitialSync() {
         syncError = nil
 
         Task {
-            var tempBackup: BackupInfo? = nil
-            var lastError: Error? = nil
-
             do {
-                if let backupManager = backupManager {
-                    tempBackup = try await backupManager.createBackup(from: DatabaseRepository.shared.dbPool(), kind: .system)
-                }
-
-                try await databaseResetter()
-
-                for toolId in adapterRegistry.getAllToolIds() {
-                    guard let syncService = syncServices[toolId] else { continue }
-
-                    let dataDirectory = fullSyncDataDirectoryProvider(toolId)
-                    do {
-                        let progress = try await syncService.syncDirectory(at: dataDirectory, toolId: toolId)
-
-                        DispatchQueue.main.async {
-                            self.syncProgress = progress
-                            self.lastSyncTime = Date()
-                        }
-                        updateToolSyncState(toolId: toolId, error: nil)
-                    } catch {
-                        lastError = error
-                        logger.error("Tool \(toolId) full sync failed: \(error.localizedDescription)")
-                        updateToolSyncState(toolId: toolId, error: error)
-                    }
-                }
-
-                if let aggregationService = self.aggregationService {
-                    do {
-                        try aggregationService.rebuildAllAggregations()
-                        self.logger.info("全量同步后聚合完成")
-                    } catch {
-                        self.logger.error("全量同步后聚合失败: \(error)")
-                    }
-                }
-
-                if let backupManager = backupManager, let backup = tempBackup {
-                    try await backupManager.deleteBackup(backup)
-                }
-
-            if let lastError = lastError {
-                DispatchQueue.main.async {
-                    self.syncError = lastError
-                }
-            }
-
-            self.notifyDataUpdated()
+                try await executeFullSync()
             } catch {
-                if let backupManager = backupManager, let backup = tempBackup {
-                    try? await backupManager.restoreBackup(backup, to: DatabaseRepository.shared.dbPool())
-                }
-
                 DispatchQueue.main.async {
                     self.syncError = error
                 }
@@ -406,6 +385,34 @@ func performInitialSync() {
             DispatchQueue.main.async {
                 self.isSyncing = false
             }
+        }
+    }
+
+    internal func executeFullSync() async throws {
+        try await createFullSyncBackup()
+        do {
+            try await databaseResetter()
+            for toolId in adapterRegistry.getAllToolIds() {
+                guard let syncService = syncServices[toolId] else {
+                    throw SyncError.databaseError(NSError(domain: "SyncCoordinator", code: 1, userInfo: [NSLocalizedDescriptionKey: "Sync service not found for \(toolId)"]))
+                }
+                let progress = try await syncService.syncDirectory(at: fullSyncDataDirectoryProvider(toolId), toolId: toolId)
+                DispatchQueue.main.async {
+                    self.syncProgress = progress
+                    self.lastSyncTime = Date()
+                }
+                updateToolSyncState(toolId: toolId, error: nil)
+            }
+            try rebuildFullSyncAggregations()
+            try await deleteFullSyncBackup()
+            notifyDataUpdated()
+        } catch {
+            do {
+                try await restoreFullSyncBackup()
+            } catch let restoreError {
+                logger.error("Full sync rollback failed: \(restoreError.localizedDescription)")
+            }
+            throw error
         }
     }
     
