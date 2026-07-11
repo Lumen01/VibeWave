@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 
 /// Manages the menu bar status item for VibeWave
+@MainActor
 public final class StatusItemManager {
 
     // MARK: - Singleton
@@ -21,6 +22,7 @@ public final class StatusItemManager {
     // MARK: - Initialization
 
     private init() {
+        _ = NSApplication.shared
         setupStatusItem()
         setupPopupWindow()
     }
