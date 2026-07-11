@@ -36,6 +36,20 @@ public class DatabaseRepositoryTests: XCTestCase {
         XCTAssertTrue(exists, "Messages and sessions tables must exist after createTables")
     }
 
+    public func testBootstrapSchemaCreatesStatisticsIndexes() throws {
+        let queue = try DatabaseQueue(path: ":memory:")
+        try queue.write { db in
+            try DatabaseRepository.bootstrapSchema(on: db)
+        }
+        let indexes = try queue.read { db in
+            Set(try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type = 'index'"))
+        }
+        XCTAssertTrue(indexes.contains("idx_messages_created_at"))
+        XCTAssertTrue(indexes.contains("idx_messages_session_created_at"))
+        XCTAssertTrue(indexes.contains("idx_messages_model_created_at"))
+        XCTAssertTrue(indexes.contains("idx_sessions_last_message_at"))
+    }
+
     public func testHasAnyData_ReturnsFalseForEmptyDatabase() throws {
         let queue = try DatabaseQueue(path: ":memory:")
         try queue.write { db in

@@ -787,16 +787,18 @@ public final class StatisticsRepository: @unchecked Sendable {
     try? dbPool.read { db in
       let row = try Row.fetchOne(db, sql: """
         SELECT
-          (SELECT COUNT(DISTINCT session_id) FROM messages WHERE created_at >= ? AND created_at <= ?) as totalSessions,
-          (SELECT COUNT(*) FROM messages WHERE created_at >= ? AND created_at <= ?) as totalMessages,
-          (SELECT SUM(cost) FROM messages WHERE created_at >= ? AND created_at <= ?) as totalCost,
-          (SELECT SUM(\(tokenSumExpression)) FROM messages WHERE created_at >= ? AND created_at <= ?) as totalTokens,
-          (SELECT SUM(CAST(token_input AS INTEGER)) FROM messages WHERE created_at >= ? AND created_at <= ?) as inputTokens,
-          (SELECT SUM(CAST(token_output AS INTEGER)) FROM messages WHERE created_at >= ? AND created_at <= ?) as outputTokens,
-          (SELECT SUM(CAST(token_reasoning AS INTEGER)) FROM messages WHERE created_at >= ? AND created_at <= ?) as reasoningTokens,
-          (SELECT SUM(cache_read) FROM messages WHERE created_at >= ? AND created_at <= ?) as cacheRead,
-          (SELECT SUM(cache_write) FROM messages WHERE created_at >= ? AND created_at <= ?) as cacheWrite
-      """, arguments: [start, end, start, end, start, end, start, end, start, end, start, end, start, end, start, end, start, end])
+          COUNT(DISTINCT session_id) as totalSessions,
+          COUNT(*) as totalMessages,
+          COALESCE(SUM(cost), 0) as totalCost,
+          COALESCE(SUM(\(tokenSumExpression)), 0) as totalTokens,
+          COALESCE(SUM(CAST(token_input AS INTEGER)), 0) as inputTokens,
+          COALESCE(SUM(CAST(token_output AS INTEGER)), 0) as outputTokens,
+          COALESCE(SUM(CAST(token_reasoning AS INTEGER)), 0) as reasoningTokens,
+          COALESCE(SUM(cache_read), 0) as cacheRead,
+          COALESCE(SUM(cache_write), 0) as cacheWrite
+        FROM messages
+        WHERE created_at >= ? AND created_at < ?
+      """, arguments: [start, end])
 
       if let row = row {
         overview = OverviewStats(
@@ -2660,7 +2662,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           COALESCE(NULLIF(project_id, ''), '未命名项目') as projectRoot,
-          COALESCE(SUM(session(session_count), 0) as sessionCount,
+          COALESCE(SUM(session_count), 0) as sessionCount,
           COALESCE(SUM(message_count), 0) as messageCount,
           COALESCE(SUM(input_tokens), 0) as inputTokens,
           COALESCE(SUM(output_tokens), 0) as outputTokens,
