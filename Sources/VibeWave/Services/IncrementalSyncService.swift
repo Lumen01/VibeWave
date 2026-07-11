@@ -10,10 +10,12 @@ public protocol MessageParsing {
 public struct ParseResult {
     public let messages: [Message]
     public let affectedSessionIds: Set<String>
+    public let error: Error?
     
-    public init(messages: [Message], affectedSessionIds: Set<String>) {
+    public init(messages: [Message], affectedSessionIds: Set<String>, error: Error? = nil) {
         self.messages = messages
         self.affectedSessionIds = affectedSessionIds
+        self.error = error
     }
 }
 
@@ -97,7 +99,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     }
 
     public func syncFile(at url: URL, toolId: String = "opencode") async throws -> (Int, Set<String>, String) {
-        let fileHash = try await waitForFileStable(at: url)
+        let (data, fileHash) = try await readStableFile(at: url)
 
         let existingMetadata = syncMetadataRepo.fetch(filePath: url.path)
 
@@ -105,7 +107,8 @@ public final class IncrementalSyncService: SyncServiceProtocol {
             return (0, [], toolId)
         }
 
-        let parseResult = parser.parseMessages(from: url)
+        let parseResult = parser.parseMessages(from: data, sourceURL: url)
+        if let error = parseResult.error { throw SyncError.parseError(error) }
         let (firstMessageTime, lastMessageTime) = messageTimeRange(from: parseResult.messages)
 
         let metadata = SyncMetadataRecord(
@@ -138,14 +141,15 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         var metadataToUpsert: [SyncMetadataRecord] = []
 
         for url in urls {
-            let fileHash = try await waitForFileStable(at: url)
+            let (data, fileHash) = try await readStableFile(at: url)
             let existingMetadata = syncMetadataRepo.fetch(filePath: url.path)
 
             if let existing = existingMetadata, existing.fileHash == fileHash {
                 continue
             }
 
-            let parseResult = parser.parseMessages(from: url)
+            let parseResult = parser.parseMessages(from: data, sourceURL: url)
+            if let error = parseResult.error { throw SyncError.parseError(error) }
             if !parseResult.messages.isEmpty {
                 messagesToInsert.append(contentsOf: parseResult.messages)
                 affectedSessionIds.formUnion(parseResult.affectedSessionIds)
@@ -253,6 +257,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
             }
 
             let parseResult = parser.parseMessages(from: data, sourceURL: fileURL)
+            if let error = parseResult.error { throw SyncError.parseError(error) }
             let (firstMessageTime, lastMessageTime) = messageTimeRange(from: parseResult.messages)
             let metadata = SyncMetadataRecord(
                 filePath: fileURL.path,
@@ -318,29 +323,27 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     }
 
     public func waitForFileStable(at url: URL) async throws -> String {
+        try await readStableFile(at: url).hash
+    }
+
+    private func readStableFile(at url: URL) async throws -> (data: Data, hash: String) {
         let maxAttempts = 3
         let delayBetweenAttempts: TimeInterval = 0.05
 
         for _ in 1...maxAttempts {
-            let hash1 = try await calculateFileHash(at: url)
+            let data1 = try Data(contentsOf: url)
+            let hash1 = calculateFileHash(for: data1)
             try await Task.sleep(nanoseconds: UInt64(delayBetweenAttempts * 1_000_000_000))
 
-            let hash2 = try await calculateFileHash(at: url)
+            let data2 = try Data(contentsOf: url)
+            let hash2 = calculateFileHash(for: data2)
 
             if hash1 == hash2 {
-                return hash1
+                return (data2, hash2)
             }
         }
 
         throw SyncError.fileUnstable(url.path)
-    }
-
-    private func calculateFileHash(at url: URL) async throws -> String {
-        guard let data = try? Data(contentsOf: url) else {
-            return ""
-        }
-
-        return calculateFileHash(for: data)
     }
 
     private func calculateFileHash(for data: Data) -> String {
