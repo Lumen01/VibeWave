@@ -41,6 +41,9 @@ jobs:
       
       - name: Save Version
         run: echo "${{ steps.version.outputs.version }}" > .version
+
+      - name: Run Tests
+        run: swift test
       
       - name: Build
         run: |
