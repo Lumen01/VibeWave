@@ -38,13 +38,12 @@ public final class FileWatcher: FileWatching {
     }
 
     private var eventStream: FSEventStreamRef?
-    private var checkTimer: DispatchSourceTimer?
+    private var debounceTimer: DispatchSourceTimer?
     private let flushInterval: TimeInterval
     private var pendingEvents: Set<String> = []
     private var watchedPaths: [String] = []
-    private let eventQueue = DispatchQueue(label: "FileWatcher.FSEvents", qos: .userInitiated)
-    private let pendingEventsQueue = DispatchQueue(label: "FileWatcher.PendingEvents")
-    private let timerQueue = DispatchQueue(label: "FileWatcher.Timer", qos: .utility)
+    private let eventQueue = DispatchQueue(label: "FileWatcher.FSEvents", qos: .utility)
+    private let pendingEventsQueue = DispatchQueue(label: "FileWatcher.PendingEvents", qos: .utility)
     private let logger = AppLogger(category: "FileWatcher")
     
     public init(flushInterval: TimeInterval = 5.0) {
@@ -59,8 +58,6 @@ public final class FileWatcher: FileWatching {
             watchedPaths.append(resolvedPath)
             restartEventStream()
         }
-
-        startTimerIfNeeded()
     }
     
     public func stopWatching() {
@@ -69,10 +66,9 @@ public final class FileWatcher: FileWatching {
 
         pendingEventsQueue.sync {
             pendingEvents.removeAll()
+            debounceTimer?.cancel()
+            debounceTimer = nil
         }
-
-        checkTimer?.cancel()
-        checkTimer = nil
     }
 
     
@@ -84,25 +80,23 @@ public final class FileWatcher: FileWatching {
 }
 
 private extension FileWatcher {
-    func startTimerIfNeeded() {
-        guard checkTimer == nil else { return }
-        guard checkTimer == nil else { return }
-        let timer = DispatchSource.makeTimerSource(queue: timerQueue)
-        timer.schedule(deadline: .now() + flushInterval, repeating: flushInterval)
+    func scheduleDebounce() {
+        guard debounceTimer == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: pendingEventsQueue)
+        timer.schedule(deadline: .now() + flushInterval)
         timer.setEventHandler { [weak self] in
+            self?.debounceTimer = nil
             self?.flushPendingEvents()
         }
         timer.resume()
-        checkTimer = timer
+        debounceTimer = timer
     }
 
     func flushPendingEvents() {
         var paths: [String] = []
-        pendingEventsQueue.sync {
-            if !pendingEvents.isEmpty {
-                paths = Array(pendingEvents)
-                pendingEvents.removeAll()
-            }
+        if !pendingEvents.isEmpty {
+            paths = Array(pendingEvents)
+            pendingEvents.removeAll()
         }
         guard !paths.isEmpty else { return }
 
@@ -128,7 +122,6 @@ private extension FileWatcher {
 
         let flags = FSEventStreamCreateFlags(
             kFSEventStreamCreateFlagFileEvents
-                | kFSEventStreamCreateFlagNoDefer
                 | kFSEventStreamCreateFlagUseCFTypes
         )
         let latency: CFTimeInterval = 0.3
@@ -169,7 +162,9 @@ private extension FileWatcher {
 
         let normalizedPath = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
         pendingEventsQueue.async { [weak self] in
-            self?.pendingEvents.insert(normalizedPath)
+            guard let self else { return }
+            self.pendingEvents.insert(normalizedPath)
+            self.scheduleDebounce()
         }
 
         logger.debug("Detected file event: \(normalizedPath)")
@@ -181,7 +176,8 @@ private extension FileWatcher {
         }
 
         let filename = URL(fileURLWithPath: path).lastPathComponent
-        return filename == "opencode.db" || filename == "opencode.db-wal" || filename == "opencode.db-shm"
+        let databaseName = URL(fileURLWithPath: ConfigService.shared.importPath).lastPathComponent
+        return filename == databaseName || filename == databaseName + "-wal" || filename == databaseName + "-shm"
     }
 
     static let eventCallback: FSEventStreamCallback = { _, info, count, eventPathsPointer, eventFlagsPointer, _ in
