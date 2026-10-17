@@ -386,3 +386,28 @@
 "about.download" = "立即下载";
 "about.later" = "稍后";
 "about.updateError" = "检查更新失败";
+
+// OpenCode source compatibility and connection
+"opencode.connection.checking.title" = "正在识别 OpenCode 数据";
+"opencode.connection.checking.detail" = "已有统计仍可查看。";
+"opencode.connection.v1.title" = "已连接 OpenCode v1";
+"opencode.connection.v1.detail" = "升级到 OpenCode v2 后，VibeWave 将自动识别并接续同步。";
+"opencode.connection.connecting.title" = "正在接入 OpenCode v2";
+"opencode.connection.connecting.detail" = "正在核对会话 %d / %d，完成后自动更新统计。已有统计仍可查看。";
+"opencode.connection.v2.title" = "已连接 OpenCode v2";
+"opencode.connection.v2.detail" = "数据已完成核对，自动同步已恢复。";
+"opencode.connection.waiting.title" = "正在等待 OpenCode 完成数据转换";
+"opencode.connection.waiting.detail" = "同步暂已暂停。已有统计已保留，OpenCode 数据就绪后将自动重试。";
+"opencode.connection.updateRequired.title" = "OpenCode 数据格式已变化，请更新 VibeWave";
+"opencode.connection.updateRequired.detail" = "当前版本无法读取这份 OpenCode 数据。同步已暂停，已有统计已保留。请查看是否有适配更新。";
+"opencode.connection.historyIncomplete.title" = "OpenCode 历史数据尚未完整接入";
+"opencode.connection.historyIncomplete.detail" = "有 %d 个会话尚未通过完整性核对；其原有统计已保留。其余已核对会话正常同步。请重试，若提示持续存在则需要核查源数据差异。";
+"opencode.connection.failed.title" = "暂时无法同步 OpenCode";
+"opencode.connection.failed.detail" = "已有统计已保留。请检查数据来源路径及读取权限，然后重试。";
+"opencode.connection.lastSuccess" = "上次完整同步：";
+"opencode.connection.viewUpdate" = "查看更新";
+"opencode.connection.retry" = "重试";
+"opencode.connection.dismiss" = "知道了";
+"opencode.connection.later" = "稍后";
+
+"opencode.connection.v2.sessionUsageDetail" = "数据已完成核对。其中 %d 个会话有仅保留汇总的附加消耗，按会话创建时间归属，模型记为“未知”。";

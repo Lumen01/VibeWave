@@ -386,3 +386,28 @@
 "about.download" = "Download";
 "about.later" = "Later";
 "about.updateError" = "Failed to check for updates";
+
+// OpenCode source compatibility and connection
+"opencode.connection.checking.title" = "Checking OpenCode data";
+"opencode.connection.checking.detail" = "Your existing statistics remain available.";
+"opencode.connection.v1.title" = "Connected to OpenCode v1";
+"opencode.connection.v1.detail" = "VibeWave will detect OpenCode v2 and reconnect automatically when you upgrade.";
+"opencode.connection.connecting.title" = "Connecting to OpenCode v2";
+"opencode.connection.connecting.detail" = "Checking session %d of %d. Statistics will update when ready; existing statistics remain available.";
+"opencode.connection.v2.title" = "Connected to OpenCode v2";
+"opencode.connection.v2.detail" = "Data checks are complete and automatic sync has resumed.";
+"opencode.connection.waiting.title" = "Waiting for OpenCode to finish converting data";
+"opencode.connection.waiting.detail" = "Sync is paused. Existing statistics are preserved. VibeWave will retry when the source is ready.";
+"opencode.connection.updateRequired.title" = "OpenCode data has changed. Update VibeWave";
+"opencode.connection.updateRequired.detail" = "This version cannot read this OpenCode data. Sync is paused and existing statistics are preserved. Check for a compatible update.";
+"opencode.connection.historyIncomplete.title" = "Some OpenCode history is not yet connected";
+"opencode.connection.historyIncomplete.detail" = "%d sessions have not passed completeness checks; their existing statistics are preserved. Other verified sessions continue syncing. Retry; persistent differences require a source data check.";
+"opencode.connection.failed.title" = "OpenCode sync is temporarily unavailable";
+"opencode.connection.failed.detail" = "Existing statistics are preserved. Check the data source path and read permissions, then retry.";
+"opencode.connection.lastSuccess" = "Last complete sync:";
+"opencode.connection.viewUpdate" = "View updates";
+"opencode.connection.retry" = "Retry";
+"opencode.connection.dismiss" = "Got it";
+"opencode.connection.later" = "Later";
+
+"opencode.connection.v2.sessionUsageDetail" = "Data checks are complete. %d sessions include usage with no retained detail; it is assigned to session creation time and an unknown model.";
