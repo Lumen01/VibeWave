@@ -31,15 +31,25 @@ public final class MenuBarViewModel: ObservableObject {
     private let statisticsRepository: StatisticsRepository
     private var cancellables = Set<AnyCancellable>()
     private let dbPool: DatabasePool
+    private var hasLoadedOnce = false
+    private var isVisible = false
+    private var needsRefresh = false
     
     private init(dbPool: DatabasePool) {
         self.dbPool = dbPool
         self.statisticsRepository = StatisticsRepository(dbPool: dbPool)
-        loadData()
         setupNotificationObserver()
+    }
+
+    public func setVisible(_ visible: Bool) {
+        isVisible = visible
+        guard visible, !hasLoadedOnce || needsRefresh else { return }
+        needsRefresh = false
+        loadData()
     }
     
     public func loadData() {
+        hasLoadedOnce = true
         isLoading = true
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -92,7 +102,12 @@ public final class MenuBarViewModel: ObservableObject {
         NotificationCenter.default.publisher(for: .appDataDidUpdate)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.loadData()
+                guard let self else { return }
+                if self.isVisible {
+                    self.loadData()
+                } else {
+                    self.needsRefresh = true
+                }
             }
             .store(in: &cancellables)
     }
