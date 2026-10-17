@@ -83,6 +83,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     private let parser: MessageParsing
     private let bulkInsertMessageThreshold = 2000
     private let bulkInsertFileThreshold = 100
+    private let skippedPathDiagnosticLimit = 100
 
     public init(
         dbPool: DatabasePool,
@@ -196,6 +197,10 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         var aggregatedSessionIds = Set<String>()
         var pendingMessages: [Message] = []
         var pendingMetadata: [SyncMetadataRecord] = []
+        let metadataByPath = Dictionary(
+            syncMetadataRepo.fetchAll(toolId: toolId).map { ($0.filePath, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
 
         func flushPending() async throws {
             guard !pendingMessages.isEmpty || !pendingMetadata.isEmpty else { return }
@@ -213,46 +218,44 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         }
 
         let fileManager = FileManager.default
-        let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        let resourceKeys: [URLResourceKey] = [.isDirectoryKey]
+        let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: resourceKeys, options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        let excludedDirs = Set(["node_modules", ".git", ".vscode", ".idea", "build", "dist"])
 
-         while let fileURL = enumerator?.nextObject() as? URL {
-              let excludedDirs = ["node_modules", ".git", ".vscode", ".idea", "build", "dist"]
-              let path = fileURL.path
-              let lastPathComponent = fileURL.lastPathComponent
-              
-              if excludedDirs.contains(lastPathComponent) {
-                  continue
-              }
-              
-              if excludedDirs.contains(where: { path.contains("/\($0)/") }) {
-                  continue
-              }
-              
-              if lastPathComponent == ".DS_Store" {
-                  continue
-              }
-              
-             progress.currentFile = fileURL.path
-             progress.totalFiles += 1
+        func recordSkipped(_ path: String) {
+            progress.skippedFiles += 1
+            if progress.skippedFilePaths.count < skippedPathDiagnosticLimit {
+                progress.skippedFilePaths.append(path)
+            }
+        }
+
+        while let fileURL = enumerator?.nextObject() as? URL {
+            let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys))
+            if resourceValues?.isDirectory == true {
+                if excludedDirs.contains(fileURL.lastPathComponent) {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
 
             guard fileURL.pathExtension == "json" else {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
                 continue
             }
 
-            guard let data = try? Data(contentsOf: fileURL) else {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+            progress.currentFile = fileURL.path
+            progress.totalFiles += 1
+
+            guard let stableFile = try? await readStableFile(at: fileURL) else {
+                recordSkipped(fileURL.path)
                 continue
             }
 
-            let fileHash = calculateFileHash(for: data)
-            let existingMetadata = syncMetadataRepo.fetch(filePath: fileURL.path)
+            let data = stableFile.data
+            let fileHash = stableFile.hash
+            let existingMetadata = metadataByPath[fileURL.path]
 
             if let existing = existingMetadata, existing.fileHash == fileHash {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+                recordSkipped(fileURL.path)
                 continue
             }
 
@@ -272,8 +275,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
             pendingMetadata.append(metadata)
 
             if parseResult.messages.isEmpty {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+                recordSkipped(fileURL.path)
             } else {
                 pendingMessages.append(contentsOf: parseResult.messages)
                 aggregatedSessionIds.formUnion(parseResult.affectedSessionIds)
@@ -331,16 +333,15 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         let delayBetweenAttempts: TimeInterval = 0.05
 
         for _ in 1...maxAttempts {
-            let data1 = try Data(contentsOf: url)
-            let hash1 = calculateFileHash(for: data1)
-            try await Task.sleep(nanoseconds: UInt64(delayBetweenAttempts * 1_000_000_000))
+            let before = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let data = try Data(contentsOf: url)
+            let after = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
 
-            let data2 = try Data(contentsOf: url)
-            let hash2 = calculateFileHash(for: data2)
-
-            if hash1 == hash2 {
-                return (data2, hash2)
+            if before.fileSize == after.fileSize && before.contentModificationDate == after.contentModificationDate {
+                return (data, calculateFileHash(for: data))
             }
+
+            try await Task.sleep(nanoseconds: UInt64(delayBetweenAttempts * 1_000_000_000))
         }
 
         throw SyncError.fileUnstable(url.path)
