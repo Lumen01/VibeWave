@@ -1,8 +1,6 @@
-# Exclude agent/AI configuration from merges - keep in separate branch
-VibeWaveTests/ merge=ours
+# 仅保留本地助手配置；应用源码与测试必须随研发分支一起合并。
 .sisyphus/ merge=ours
 AGENT.md merge=ours
 AGENTS.md merge=ours
 CLAUD.md merge=ours
-Sources/VibeWave/AppConfiguration.swift merge=ours
 .build_number merge=ours
