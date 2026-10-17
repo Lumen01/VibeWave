@@ -431,7 +431,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let valueField: String
       switch metric {
       case .messages:
-        valueField = "COUNT(*)"
+        valueField = "COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END)"
       case .tokens:
         valueField = "SUM(\(tokenSumExpression))"
       case .cost:
@@ -586,7 +586,7 @@ public final class StatisticsRepository: @unchecked Sendable {
             WHEN CAST(strftime('%H', created_at, 'unixepoch', 'localtime') AS INTEGER) BETWEEN 18 AND 23 THEN 'evening'
             ELSE 'night'
           END as cluster,
-          COUNT(*) as messageCount
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY cluster
@@ -645,7 +645,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         SELECT
           strftime('%w', datetime(created_at, 'unixepoch', 'localtime')) as dayOfWeek,
           strftime('%Y-%m-%d', created_at, 'unixepoch', 'localtime') as date,
-          COUNT(*) as messageCount
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY date
@@ -729,7 +729,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           strftime('%Y-%m-%d', created_at, 'unixepoch', 'localtime') as date,
-          COUNT(*) as value
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as value
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY date
@@ -768,7 +768,7 @@ public final class StatisticsRepository: @unchecked Sendable {
   private func buildMetricColumn(for metric: MetricType) -> String {
     switch metric {
     case .messages:
-      return "COUNT(*)"
+      return "COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END)"
     case .tokens:
       return "SUM(\(tokenSumExpression))"
     case .cost:
@@ -788,7 +788,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let row = try Row.fetchOne(db, sql: """
         SELECT
           COUNT(DISTINCT session_id) as totalSessions,
-          COUNT(*) as totalMessages,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as totalMessages,
           COALESCE(SUM(cost), 0) as totalCost,
           COALESCE(SUM(\(tokenSumExpression)), 0) as totalTokens,
           COALESCE(SUM(CAST(token_input AS INTEGER)), 0) as inputTokens,
@@ -953,7 +953,7 @@ public final class StatisticsRepository: @unchecked Sendable {
           SELECT
             strftime('%Y-%m-%d', created_at / 1000.0, 'unixepoch', 'localtime') AS day_key,
             COUNT(DISTINCT session_id) AS sessions,
-            COUNT(*) AS messages,
+            COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) AS messages,
             COALESCE(SUM(cost), 0) AS cost,
             COALESCE(SUM(CAST(COALESCE(token_input, '0') AS INTEGER)), 0) AS input_tokens,
             COALESCE(SUM(CAST(COALESCE(token_output, '0') AS INTEGER)), 0) AS output_tokens,
@@ -1051,7 +1051,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           strftime('%Y-%m-%d', created_at, 'unixepoch', 'localtime') as date,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
           SUM(\(tokenSumExpression)) as tokenCount,
           SUM(cost) as cost
         FROM messages
@@ -1087,7 +1087,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           CAST(strftime('%H', created_at, 'unixepoch', 'localtime') AS INTEGER) as hour,
-          COUNT(*) as messageCount
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY hour
@@ -1112,7 +1112,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let valueField: String
       switch metric {
       case .messages:
-        valueField = "COUNT(*)"
+        valueField = "COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END)"
       case .tokens:
         valueField = "SUM(\(tokenSumExpression))"
       case .cost:
@@ -1527,7 +1527,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       if let row = try Row.fetchOne(db, sql: """
         SELECT
           SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS user_count,
-          SUM(CASE WHEN role = 'assistant' OR (agent IS NOT NULL AND agent != '') THEN 1 ELSE 0 END) AS agent_count
+          SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS agent_count
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
       """, arguments: [start, end]) {
@@ -1554,7 +1554,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       if let row = try Row.fetchOne(db, sql: """
         SELECT
           COUNT(DISTINCT CASE WHEN role = 'user' THEN session_id END) AS user_sessions,
-          COUNT(DISTINCT CASE WHEN role = 'assistant' OR (agent IS NOT NULL AND agent != '') THEN session_id END) AS agent_sessions,
+          COUNT(DISTINCT CASE WHEN role = 'assistant' THEN session_id END) AS agent_sessions,
           COUNT(DISTINCT session_id) AS total_sessions
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
@@ -1584,7 +1584,7 @@ public final class StatisticsRepository: @unchecked Sendable {
           COUNT(DISTINCT session_id) AS session_count
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
-          AND (role = 'assistant' OR (agent IS NOT NULL AND agent != ''))
+          AND (role = 'assistant')
         GROUP BY agent_name
         ORDER BY session_count DESC
       """, arguments: [start, end])
@@ -1630,8 +1630,8 @@ public final class StatisticsRepository: @unchecked Sendable {
       if let row = try Row.fetchOne(db, sql: """
         SELECT
           SUM(CASE WHEN cost > 0 THEN cost ELSE 0 END) as totalCost,
-          SUM(CASE WHEN cost > 0 THEN 1 ELSE 0 END) as billedCount,
-          COUNT(*) as totalCount
+          SUM(CASE WHEN cost > 0 AND role IN ('user', 'assistant') THEN 1 ELSE 0 END) as billedCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as totalCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
       """, arguments: [start, end]) {
@@ -1657,7 +1657,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         SELECT
           \(groupByClause) as timeGroup,
           SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as userCount,
-          SUM(CASE WHEN role = 'assistant' OR (agent IS NOT NULL AND agent != '') THEN 1 ELSE 0 END) as agentCount
+          SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) as agentCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY timeGroup
@@ -1891,7 +1891,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let hourlyRows = try Row.fetchAll(db, sql: """
         SELECT
           CAST(strftime('%H', created_at / 1000.0, 'unixepoch', 'localtime') AS INTEGER) AS hour_of_day,
-          COUNT(*) AS message_count
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) AS message_count
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY hour_of_day
@@ -1966,7 +1966,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           strftime('%Y-%m-%d', created_at / 1000.0, 'unixepoch', 'localtime') AS day_key,
-          COUNT(*) AS message_count,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) AS message_count,
           COUNT(DISTINCT session_id) AS session_count,
           SUM(COALESCE(cost, 0)) AS cost_total,
           SUM(COALESCE(summary_total_additions, 0) - COALESCE(summary_total_deletions, 0)) AS net_output
@@ -2017,7 +2017,7 @@ public final class StatisticsRepository: @unchecked Sendable {
       let rows = try Row.fetchAll(db, sql: """
         SELECT
           \(groupByClause) as timeGroup,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
           COUNT(DISTINCT session_id) as sessionCount
         FROM messages
         WHERE created_at >= ? AND created_at <= ?
@@ -2113,7 +2113,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         SELECT
           project_root,
           COUNT(DISTINCT session_id) as sessionCount,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
           SUM(CAST(token_input AS INTEGER)) as inputTokens,
           SUM(CAST(token_output AS INTEGER)) as outputTokens,
           SUM(cache_read) as cacheRead,
@@ -2606,7 +2606,7 @@ public final class StatisticsRepository: @unchecked Sendable {
           SELECT 
             session_id,
             MIN(created_at) as firstMessageAt,
-            COUNT(*) as messageCount,
+            COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
             SUM(CAST(COALESCE(token_input, '0') AS INTEGER)) as inputTokens,
             SUM(CAST(COALESCE(token_output, '0') AS INTEGER)) as outputTokens,
             SUM(CAST(COALESCE(token_reasoning, '0') AS INTEGER)) as reasoningTokens,
@@ -2712,7 +2712,7 @@ public final class StatisticsRepository: @unchecked Sendable {
           provider_id,
           model_id,
           COUNT(DISTINCT session_id) as sessionCount,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
           SUM(\(tokenSumExpression)) as tokens,
           SUM(CAST(token_input AS INTEGER)) as inputTokens,
           SUM(CAST(token_output AS INTEGER)) as outputTokens,
@@ -2824,7 +2824,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         SELECT
           date(m.created_at, 'unixepoch', 'localtime') as date,
           COUNT(DISTINCT m.session_id) as sessionCount,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN m.role IN ('user', 'assistant') THEN 1 END) as messageCount,
           SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)) as inputTokens,
           SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)) as outputTokens,
           SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)) as reasoningTokens,
@@ -2889,7 +2889,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         SELECT
           date(created_at, 'unixepoch', 'localtime') as date,
           COUNT(DISTINCT session_id) as sessionCount,
-          COUNT(*) as messageCount,
+          COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) as messageCount,
           SUM(CAST(COALESCE(token_input, '0') AS INTEGER)) as inputTokens,
           SUM(CAST(COALESCE(token_output, '0') AS INTEGER)) as outputTokens,
           SUM(CAST(COALESCE(token_reasoning, '0') AS INTEGER)) as reasoningTokens,
@@ -3271,7 +3271,7 @@ public final class StatisticsRepository: @unchecked Sendable {
                                 ELSE 0
                             END
                         ) AS duration_seconds,
-                        COUNT(*) AS total_messages,
+                        COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) AS total_messages,
                         SUM(
                             CASE
                                 WHEN completed_at IS NOT NULL AND completed_at > created_at THEN 1
@@ -3415,7 +3415,7 @@ public final class StatisticsRepository: @unchecked Sendable {
                 SELECT
                     \(dayStart) AS day_start_ms,
                     SUM(CAST(COALESCE(token_input, '0') AS INTEGER)) AS input_tokens_value,
-                    COUNT(*) AS messages_value,
+                    COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END) AS messages_value,
                     SUM(COALESCE(cost, 0)) AS cost_value
                 FROM messages
                 WHERE created_at >= ? AND created_at < ?
@@ -3479,7 +3479,7 @@ public final class StatisticsRepository: @unchecked Sendable {
         case .inputTokens:
             return "SUM(CAST(COALESCE(token_input, '0') AS INTEGER))"
         case .messages:
-            return "COUNT(*)"
+            return "COUNT(CASE WHEN role IN ('user', 'assistant') THEN 1 END)"
         case .cost:
             return "SUM(COALESCE(cost, 0))"
         }
