@@ -12,11 +12,13 @@ public final class LocalizationManager: ObservableObject {
     }
   }
   
-  private let userDefaults = UserDefaults.standard
-  private let resourcesBundle = ResourceBundleLocator.resourceBundle
+  private let userDefaults: UserDefaults
+  private let resourcesBundle: Bundle
   private var languageBundle: Bundle?
   
-  public init() {
+  public init(userDefaults: UserDefaults = .standard, resourcesBundle: Bundle? = nil) {
+    self.userDefaults = userDefaults
+    self.resourcesBundle = resourcesBundle ?? ResourceBundleLocator.resourceBundle
     // Load saved language preference
     if let savedLanguage = userDefaults.string(forKey: "app.language") {
       self.currentLanguage = normalizedLanguageCode(savedLanguage)
