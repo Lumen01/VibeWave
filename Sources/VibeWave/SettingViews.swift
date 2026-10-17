@@ -92,6 +92,7 @@ public struct SettingsView: View {
 
   private var settingsSyncSectionContent: some View {
     VStack(alignment: .leading, spacing: 16) {
+      OpenCodeConnectionStatusView(alwaysVisible: true)
       VStack(alignment: .leading, spacing: 8) {
         Text(L10n.settingsDataSource)
           .font(.subheadline)
