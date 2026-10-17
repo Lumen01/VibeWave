@@ -24,7 +24,7 @@ public final class SettingsViewModel: ObservableObject {
     }
   }
   @Published public var selectedSectionTab: SettingsViewModel.SettingsSectionTab = .general
-  @Published public var logLevel: LogLevel = .debug
+  @Published public var logLevel: LogLevel = SettingsViewModel.defaultLogLevel
   @Published public var backupEnabled: Bool = true
   @Published public var backupRetentionCount: Int = 5
   @Published public var backupIntervalHours: Int = 24
@@ -75,6 +75,14 @@ public final class SettingsViewModel: ObservableObject {
   }
 
   public typealias LogLevel = AppLogLevel
+
+  private static var defaultLogLevel: LogLevel {
+#if DEBUG
+    .debug
+#else
+    .info
+#endif
+  }
 
   public init() {
     self.userDefaults = UserDefaults.standard
@@ -200,6 +208,7 @@ public final class SettingsViewModel: ObservableObject {
     userDefaults.set(syncStrategy.rawValue, forKey: "sync.strategy")
     userDefaults.set(theme.rawValue, forKey: "theme")
     userDefaults.set(logLevel.rawValue, forKey: "log.level")
+    AppLogger.updateConfiguredLevel(logLevel)
     userDefaults.set(backupEnabled, forKey: "backup.enabled")
     userDefaults.set(backupRetentionCount, forKey: "backup.maxCount")
     userDefaults.set(backupIntervalHours, forKey: "backup.interval")
@@ -258,7 +267,7 @@ public final class SettingsViewModel: ObservableObject {
     dataSourcePath = ConfigService.shared.defaultImportPath
     syncStrategy = .auto
     theme = .system
-    logLevel = .debug
+    logLevel = Self.defaultLogLevel
     backupEnabled = true
     backupRetentionCount = 5
     backupIntervalHours = 24
