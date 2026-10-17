@@ -7,6 +7,7 @@ import SwiftUI
 ///
 /// These tests verify that StatusItemManager correctly manages the menu bar status item,
 /// including creation, click handling, and popup window interaction.
+@MainActor
 final class StatusItemManagerTests: XCTestCase {
 
     // MARK: - Test Helper Methods

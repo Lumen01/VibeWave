@@ -23,4 +23,21 @@ final class AppLoggerTests: XCTestCase {
         XCTAssertEqual(captured.first?.level, .error)
         XCTAssertEqual(captured.first?.message, "error message")
     }
+
+    func testLogger_DoesNotEvaluateFilteredMessage() {
+        let defaults = UserDefaults(suiteName: "app-logger-lazy-tests")!
+        defaults.removePersistentDomain(forName: "app-logger-lazy-tests")
+        defaults.set(AppLogger.LogLevel.info.rawValue, forKey: "log.level")
+        let logger = AppLogger(category: "test", userDefaults: defaults)
+        var evaluated = false
+
+        func message() -> String {
+            evaluated = true
+            return "debug message"
+        }
+
+        logger.debug(message())
+
+        XCTAssertFalse(evaluated)
+    }
 }

@@ -78,6 +78,9 @@ public struct ContentView: View {
         tabContent.textSelection(.disabled)
       }
     }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      OpenCodeConnectionStatusView()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .showSettingsAbout)) { _ in
       selectedTab = .settings
     }

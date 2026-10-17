@@ -79,9 +79,20 @@ public final class DatabaseRepository {
     try reconcileSyncMetadataSchema(on: db)
     try createAggregationTables(on: db)
     try reconcileAggregationSchema(on: db)
+    try createQueryIndexes(on: db)
 
     // No longer rely on GRDB migration history.
     try db.execute(sql: "DROP TABLE IF EXISTS grdb_migrations")
+  }
+
+  private static func createQueryIndexes(on db: Database) throws {
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_messages_tool_id ON messages(tool_id)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_messages_session_created_at ON messages(session_id, created_at)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_messages_model_created_at ON messages(model_id, created_at)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_tool_id ON sessions(tool_id)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sessions_last_message_at ON sessions(last_message_at)")
+    try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_sync_metadata_tool ON sync_metadata(tool_id)")
   }
 
   public static func createAggregationTables(on db: Database) throws {

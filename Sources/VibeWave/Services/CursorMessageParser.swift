@@ -17,7 +17,8 @@ public final class CursorMessageParser: MessageParsing {
         
         return ParseResult(
             messages: parserResult.messages,
-            affectedSessionIds: affectedSessionIds
+            affectedSessionIds: affectedSessionIds,
+            error: parserResult.error
         )
     }
 
@@ -31,7 +32,8 @@ public final class CursorMessageParser: MessageParsing {
 
         return ParseResult(
             messages: parserResult.messages,
-            affectedSessionIds: affectedSessionIds
+            affectedSessionIds: affectedSessionIds,
+            error: parserResult.error
         )
     }
 }

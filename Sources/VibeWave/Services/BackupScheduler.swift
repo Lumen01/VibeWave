@@ -46,6 +46,7 @@ public final class BackupScheduler {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.triggerScheduledBackup()
         }
+        timer?.tolerance = min(interval * 0.1, 300)
     }
     
     public func stopScheduledBackups() {

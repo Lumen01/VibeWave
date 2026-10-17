@@ -12,13 +12,6 @@ public enum AppConfiguration {
             Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         }()
     }
-    
-    public enum BuildInfo {
-        public static let buildNumber = 40
-        public static let buildDate = "2026-02-23 11:00:57"
-        public static let gitCommit = "fc208af"
-    }
-    
     public enum Developer {
         public static let name = "Lumen"
         public static let copyright = "Copyright © 2026 Lumen. All rights reserved."

@@ -11,20 +11,21 @@ public final class DatabaseMigrationService {
     }
     
     /// 执行所有必要的迁移
-    public func performMigrations() throws {
+    @discardableResult
+    public func performMigrations() throws -> Bool {
         logger.info("开始执行数据库迁移")
         
-        try migrate1_fixProjectNameExtraction()
-        try migrate2_fixEmptyProjectNames()
-        try migrate3_rebuildAggregations()
+        let migration1ChangedData = try migrate1_fixProjectNameExtraction()
+        let migration2ChangedData = try migrate2_fixEmptyProjectNames()
         
         logger.info("数据库迁移完成")
+        return migration1ChangedData || migration2ChangedData
     }
     
     // MARK: - Migration 1: 修复 project_name 提取逻辑
     /// 修复由于 RTRIM bug 导致的 project_name 提取错误
     /// 问题：RTRIM 移除字符集而非子串，导致提取出完整路径而非项目名称
-    private func migrate1_fixProjectNameExtraction() throws {
+    private func migrate1_fixProjectNameExtraction() throws -> Bool {
         try dbPool.write { db in
             // 检查是否需要迁移
             let emptyProjectCount = try Int.fetchOne(db, sql: """
@@ -38,7 +39,7 @@ public final class DatabaseMigrationService {
 
             if emptyProjectCount == 0 && wrongProjectCount == 0 {
                 logger.info("Migration 1: 无需修复，project_name 数据正常")
-                return
+                return false
             }
 
             logger.info("Migration 1: 发现 \(emptyProjectCount) 个空 project_name, \(wrongProjectCount) 个错误 project_name")
@@ -87,12 +88,13 @@ public final class DatabaseMigrationService {
                 SELECT COUNT(*) FROM sessions WHERE project_name IS NOT NULL AND project_name != '' AND project_name NOT LIKE '%/%'
             """) ?? 0
             logger.info("Migration 1: 已修复 project_name，当前有 \(fixedCount) 个有效 project_name")
+            return true
         }
     }
     
     // MARK: - Migration 2: 修复空 project_name 使用 project_cwd 后备
     /// 对于 project_root 为 '/' 或空的情况，使用 project_cwd 提取项目名
-    private func migrate2_fixEmptyProjectNames() throws {
+    private func migrate2_fixEmptyProjectNames() throws -> Bool {
         try dbPool.write { db in
             // 检查剩余的空 project_name
             let emptyCount = try Int.fetchOne(db, sql: """
@@ -101,7 +103,7 @@ public final class DatabaseMigrationService {
 
             if emptyCount == 0 {
                 logger.info("Migration 2: 无需修复，没有空 project_name")
-                return
+                return false
             }
 
             logger.info("Migration 2: 发现 \(emptyCount) 个空 project_name，尝试使用 project_cwd 修复")
@@ -144,14 +146,8 @@ public final class DatabaseMigrationService {
             """) ?? 0
 
             logger.info("Migration 2: 修复完成，剩余 \(finalEmptyCount) 个空 project_name")
+            return true
         }
     }
     
-    // MARK: - Migration 3: 重新构建聚合数据
-    /// 使用修复后的 project_name 重新构建 hourly_stats、daily_stats 和 monthly_stats
-    private func migrate3_rebuildAggregations() throws {
-        logger.info("Migration 3: 开始重新构建聚合数据")
-        try AggregationService(dbPool: dbPool).rebuildAllAggregations()
-        logger.info("Migration 3: 聚合数据重建完成")
-    }
 }

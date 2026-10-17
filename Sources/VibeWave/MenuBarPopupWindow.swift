@@ -59,12 +59,12 @@ public final class MenuBarPopupWindow {
         hostingController.view.layer?.masksToBounds = true
 
         nsWindow = window
-        setupLifecycleObservers()
     }
 
     // MARK: - Lifecycle Management
 
     private func setupLifecycleObservers() {
+        guard notificationObservers.isEmpty else { return }
         let resignActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil,
@@ -104,6 +104,8 @@ public final class MenuBarPopupWindow {
 
     /// Shows the popup window positioned below the status bar icon
     public func show() {
+        setupLifecycleObservers()
+        MenuBarViewModel.shared.setVisible(true)
         guard let window = nsWindow,
               let screen = NSScreen.main else {
             nsWindow?.orderFront(nil)
@@ -156,6 +158,7 @@ public final class MenuBarPopupWindow {
     /// Closes the popup window
     public func close() {
         guard let window = nsWindow else { return }
+        MenuBarViewModel.shared.setVisible(false)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.3

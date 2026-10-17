@@ -254,6 +254,36 @@ final class SessionServiceTests: XCTestCase {
         XCTAssertEqual(allSessions.count, 2, "Should have exactly 2 sessions")
     }
 
+    func testRebuildAllSessions_DeduplicatesDiffFilesAcrossMessages() throws {
+        try dbPool.write { db in
+            try db.execute(sql: """
+                INSERT INTO messages (id, session_id, role, created_at, diff_files)
+                VALUES ('one', 'session-1', 'assistant', 1, 'a.swift,b.swift'),
+                       ('two', 'session-1', 'assistant', 2, 'b.swift,c.swift'),
+                       ('three', 'session-2', 'assistant', 3, 'other.swift')
+            """)
+        }
+
+        try sessionService.rebuildAllSessions()
+
+        XCTAssertEqual(sessionRepository.fetch(by: "session-1")?.totalFileCount, 3)
+        XCTAssertEqual(sessionRepository.fetch(by: "session-2")?.totalFileCount, 1)
+    }
+
+    func testRecalculateSessions_DeduplicatesDiffFilesForSelectedSessions() throws {
+        try dbPool.write { db in
+            try db.execute(sql: """
+                INSERT INTO messages (id, session_id, role, created_at, diff_files)
+                VALUES ('one', 'session-1', 'assistant', 1, 'a.swift,b.swift'),
+                       ('two', 'session-1', 'assistant', 2, 'a.swift,c.swift')
+            """)
+        }
+
+        try sessionService.recalculateSessions(for: ["session-1"])
+
+        XCTAssertEqual(sessionRepository.fetch(by: "session-1")?.totalFileCount, 3)
+    }
+
     func testDeleteSession_WhenSessionExists_DeletesMessagesAndSession() throws {
         let sessionId = "test-session-1"
         let now = Date()

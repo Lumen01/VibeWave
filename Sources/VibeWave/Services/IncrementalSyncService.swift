@@ -10,10 +10,12 @@ public protocol MessageParsing {
 public struct ParseResult {
     public let messages: [Message]
     public let affectedSessionIds: Set<String>
+    public let error: Error?
     
-    public init(messages: [Message], affectedSessionIds: Set<String>) {
+    public init(messages: [Message], affectedSessionIds: Set<String>, error: Error? = nil) {
         self.messages = messages
         self.affectedSessionIds = affectedSessionIds
+        self.error = error
     }
 }
 
@@ -81,6 +83,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     private let parser: MessageParsing
     private let bulkInsertMessageThreshold = 2000
     private let bulkInsertFileThreshold = 100
+    private let skippedPathDiagnosticLimit = 100
 
     public init(
         dbPool: DatabasePool,
@@ -97,7 +100,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     }
 
     public func syncFile(at url: URL, toolId: String = "opencode") async throws -> (Int, Set<String>, String) {
-        let fileHash = try await waitForFileStable(at: url)
+        let (data, fileHash) = try await readStableFile(at: url)
 
         let existingMetadata = syncMetadataRepo.fetch(filePath: url.path)
 
@@ -105,7 +108,8 @@ public final class IncrementalSyncService: SyncServiceProtocol {
             return (0, [], toolId)
         }
 
-        let parseResult = parser.parseMessages(from: url)
+        let parseResult = parser.parseMessages(from: data, sourceURL: url)
+        if let error = parseResult.error { throw SyncError.parseError(error) }
         let (firstMessageTime, lastMessageTime) = messageTimeRange(from: parseResult.messages)
 
         let metadata = SyncMetadataRecord(
@@ -138,14 +142,15 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         var metadataToUpsert: [SyncMetadataRecord] = []
 
         for url in urls {
-            let fileHash = try await waitForFileStable(at: url)
+            let (data, fileHash) = try await readStableFile(at: url)
             let existingMetadata = syncMetadataRepo.fetch(filePath: url.path)
 
             if let existing = existingMetadata, existing.fileHash == fileHash {
                 continue
             }
 
-            let parseResult = parser.parseMessages(from: url)
+            let parseResult = parser.parseMessages(from: data, sourceURL: url)
+            if let error = parseResult.error { throw SyncError.parseError(error) }
             if !parseResult.messages.isEmpty {
                 messagesToInsert.append(contentsOf: parseResult.messages)
                 affectedSessionIds.formUnion(parseResult.affectedSessionIds)
@@ -192,6 +197,10 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         var aggregatedSessionIds = Set<String>()
         var pendingMessages: [Message] = []
         var pendingMetadata: [SyncMetadataRecord] = []
+        let metadataByPath = Dictionary(
+            syncMetadataRepo.fetchAll(toolId: toolId).map { ($0.filePath, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
 
         func flushPending() async throws {
             guard !pendingMessages.isEmpty || !pendingMetadata.isEmpty else { return }
@@ -209,50 +218,49 @@ public final class IncrementalSyncService: SyncServiceProtocol {
         }
 
         let fileManager = FileManager.default
-        let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        let resourceKeys: [URLResourceKey] = [.isDirectoryKey]
+        let enumerator = fileManager.enumerator(at: url, includingPropertiesForKeys: resourceKeys, options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        let excludedDirs = Set(["node_modules", ".git", ".vscode", ".idea", "build", "dist"])
 
-         while let fileURL = enumerator?.nextObject() as? URL {
-              let excludedDirs = ["node_modules", ".git", ".vscode", ".idea", "build", "dist"]
-              let path = fileURL.path
-              let lastPathComponent = fileURL.lastPathComponent
-              
-              if excludedDirs.contains(lastPathComponent) {
-                  continue
-              }
-              
-              if excludedDirs.contains(where: { path.contains("/\($0)/") }) {
-                  continue
-              }
-              
-              if lastPathComponent == ".DS_Store" {
-                  continue
-              }
-              
-             progress.currentFile = fileURL.path
-             progress.totalFiles += 1
+        func recordSkipped(_ path: String) {
+            progress.skippedFiles += 1
+            if progress.skippedFilePaths.count < skippedPathDiagnosticLimit {
+                progress.skippedFilePaths.append(path)
+            }
+        }
+
+        while let fileURL = enumerator?.nextObject() as? URL {
+            let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys))
+            if resourceValues?.isDirectory == true {
+                if excludedDirs.contains(fileURL.lastPathComponent) {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
 
             guard fileURL.pathExtension == "json" else {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
                 continue
             }
 
-            guard let data = try? Data(contentsOf: fileURL) else {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+            progress.currentFile = fileURL.path
+            progress.totalFiles += 1
+
+            guard let stableFile = try? await readStableFile(at: fileURL) else {
+                recordSkipped(fileURL.path)
                 continue
             }
 
-            let fileHash = calculateFileHash(for: data)
-            let existingMetadata = syncMetadataRepo.fetch(filePath: fileURL.path)
+            let data = stableFile.data
+            let fileHash = stableFile.hash
+            let existingMetadata = metadataByPath[fileURL.path]
 
             if let existing = existingMetadata, existing.fileHash == fileHash {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+                recordSkipped(fileURL.path)
                 continue
             }
 
             let parseResult = parser.parseMessages(from: data, sourceURL: fileURL)
+            if let error = parseResult.error { throw SyncError.parseError(error) }
             let (firstMessageTime, lastMessageTime) = messageTimeRange(from: parseResult.messages)
             let metadata = SyncMetadataRecord(
                 filePath: fileURL.path,
@@ -267,8 +275,7 @@ public final class IncrementalSyncService: SyncServiceProtocol {
             pendingMetadata.append(metadata)
 
             if parseResult.messages.isEmpty {
-                progress.skippedFiles += 1
-                progress.skippedFilePaths.append(fileURL.path)
+                recordSkipped(fileURL.path)
             } else {
                 pendingMessages.append(contentsOf: parseResult.messages)
                 aggregatedSessionIds.formUnion(parseResult.affectedSessionIds)
@@ -318,29 +325,26 @@ public final class IncrementalSyncService: SyncServiceProtocol {
     }
 
     public func waitForFileStable(at url: URL) async throws -> String {
+        try await readStableFile(at: url).hash
+    }
+
+    private func readStableFile(at url: URL) async throws -> (data: Data, hash: String) {
         let maxAttempts = 3
         let delayBetweenAttempts: TimeInterval = 0.05
 
         for _ in 1...maxAttempts {
-            let hash1 = try await calculateFileHash(at: url)
-            try await Task.sleep(nanoseconds: UInt64(delayBetweenAttempts * 1_000_000_000))
+            let before = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let data = try Data(contentsOf: url)
+            let after = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
 
-            let hash2 = try await calculateFileHash(at: url)
-
-            if hash1 == hash2 {
-                return hash1
+            if before.fileSize == after.fileSize && before.contentModificationDate == after.contentModificationDate {
+                return (data, calculateFileHash(for: data))
             }
+
+            try await Task.sleep(nanoseconds: UInt64(delayBetweenAttempts * 1_000_000_000))
         }
 
         throw SyncError.fileUnstable(url.path)
-    }
-
-    private func calculateFileHash(at url: URL) async throws -> String {
-        guard let data = try? Data(contentsOf: url) else {
-            return ""
-        }
-
-        return calculateFileHash(for: data)
     }
 
     private func calculateFileHash(for data: Data) -> String {

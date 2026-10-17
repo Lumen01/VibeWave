@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 import os
 
 public struct ToolSyncState {
@@ -38,6 +39,12 @@ public final class SyncCoordinator: ObservableObject {
     private let toolDataDirectoryProvider: (String) -> URL
     private let fullSyncDataDirectoryProvider: (String) -> URL
     private let databaseResetter: () async throws -> Void
+    private let createFullSyncBackup: () async throws -> Void
+    private let restoreFullSyncBackup: () async throws -> Void
+    private let deleteFullSyncBackup: () async throws -> Void
+    private let rebuildFullSyncAggregations: () throws -> Void
+    private let performInitialMigrations: () throws -> Bool
+    private let rebuildAggregations: () throws -> Void
     private let logger = AppLogger(category: "SyncCoordinator")
 
     private init() {
@@ -49,6 +56,30 @@ public final class SyncCoordinator: ObservableObject {
             backupDirectory: backupDirectory,
             additionalSearchDirectories: [legacyBackupDirectory]
         )
+        let manager = backupManager!
+        let pool = DatabaseRepository.shared.dbPool()
+        var fullSyncBackup: BackupInfo?
+        self.createFullSyncBackup = {
+            fullSyncBackup = try await manager.createBackup(from: pool, kind: .system)
+        }
+        self.restoreFullSyncBackup = {
+            guard let backup = fullSyncBackup else { return }
+            try await manager.restoreBackup(backup, to: pool)
+        }
+        self.deleteFullSyncBackup = {
+            guard let backup = fullSyncBackup else { return }
+            try await manager.deleteBackup(backup)
+            fullSyncBackup = nil
+        }
+        self.rebuildFullSyncAggregations = {
+            try AggregationService(dbPool: pool).rebuildAllAggregations()
+        }
+        self.performInitialMigrations = {
+            try DatabaseMigrationService(dbPool: pool).performMigrations()
+        }
+        self.rebuildAggregations = {
+            try AggregationService(dbPool: pool).rebuildAllAggregations()
+        }
 
         self.notificationCenter = .default
         self.fileWatcher = FileWatcher(flushInterval: 5.0)
@@ -99,6 +130,9 @@ public final class SyncCoordinator: ObservableObject {
         setupFileWatcherEvents()
         setupSyncSettingsObserver()
         setupDataSourceObserver()
+        notificationCenter.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in self?.performInitialSync() }
+            .store(in: &cancellables)
     }
 
     internal init(
@@ -108,6 +142,12 @@ public final class SyncCoordinator: ObservableObject {
         toolDataDirectoryProvider: @escaping (String) -> URL,
         fullSyncDataDirectoryProvider: @escaping (String) -> URL,
         databaseResetter: @escaping () async throws -> Void,
+        createFullSyncBackup: @escaping () async throws -> Void = {},
+        restoreFullSyncBackup: @escaping () async throws -> Void = {},
+        deleteFullSyncBackup: @escaping () async throws -> Void = {},
+        rebuildFullSyncAggregations: @escaping () throws -> Void = {},
+        performInitialMigrations: @escaping () throws -> Bool = { false },
+        rebuildAggregations: @escaping () throws -> Void = {},
         fileWatcher: FileWatching = FileWatcher(),
         scheduler: SyncScheduling = SyncScheduler(),
         syncStrategyProvider: @escaping () -> SyncStrategy = {
@@ -120,6 +160,12 @@ public final class SyncCoordinator: ObservableObject {
         self.toolDataDirectoryProvider = toolDataDirectoryProvider
         self.fullSyncDataDirectoryProvider = fullSyncDataDirectoryProvider
         self.databaseResetter = databaseResetter
+        self.createFullSyncBackup = createFullSyncBackup
+        self.restoreFullSyncBackup = restoreFullSyncBackup
+        self.deleteFullSyncBackup = deleteFullSyncBackup
+        self.rebuildFullSyncAggregations = rebuildFullSyncAggregations
+        self.performInitialMigrations = performInitialMigrations
+        self.rebuildAggregations = rebuildAggregations
         self.fileWatcher = fileWatcher
         self.scheduler = scheduler
         self.syncStrategyProvider = syncStrategyProvider
@@ -223,6 +269,8 @@ func performInitialSync() {
         
         Task {
             var lastError: Error? = nil
+            var importedCount = 0
+            var migrationsChangedData = false
 
             // Sync all registered tools
             for toolId in adapterRegistry.getAllToolIds() {
@@ -236,36 +284,36 @@ func performInitialSync() {
 
                 do {
                     let progress = try await syncService.syncDirectory(at: dataDirectory, toolId: toolId)
+                    importedCount += progress.importedFiles
 
                     DispatchQueue.main.async {
                         self.syncProgress = progress
-                        self.lastSyncTime = Date()
+                        self.lastSyncTime = (syncService as? OpenCodeDatabaseSyncService).map { $0.lastCompleteSync } ?? Date()
                     }
 
                     logger.debug("Tool \(toolId) sync completed: \(progress.importedFiles) imported, \(progress.skippedFiles) skipped")
                     updateToolSyncState(toolId: toolId, error: nil)
 
-                    // 执行数据库迁移（修复 project_name 提取问题）
-                    do {
-                        let migrationService = DatabaseMigrationService(dbPool: DatabaseRepository.shared.dbPool())
-                        try migrationService.performMigrations()
-                        self.logger.info("数据库迁移完成")
-                    } catch {
-                        self.logger.error("数据库迁移失败：\(error)")
-                    }
-                    // 聚合数据
-                    if let aggregationService = self.aggregationService {
-                        do {
-                            try aggregationService.rebuildAllAggregations()
-                            self.logger.info("数据聚合完成")
-                        } catch {
-                            self.logger.error("数据聚合失败：\(error)")
-                        }
-                    }
                 } catch {
                     lastError = error
                     logger.error("Tool \(toolId) initial sync failed: \(error.localizedDescription)")
                     updateToolSyncState(toolId: toolId, error: error)
+                }
+            }
+
+            do {
+                migrationsChangedData = try self.performInitialMigrations()
+                self.logger.info("数据库迁移完成")
+            } catch {
+                self.logger.error("数据库迁移失败：\(error)")
+            }
+
+            if importedCount > 0 || migrationsChangedData {
+                do {
+                    try self.rebuildAggregations()
+                    self.logger.info("数据聚合完成")
+                } catch {
+                    self.logger.error("数据聚合失败：\(error)")
                 }
             }
 
@@ -275,12 +323,10 @@ func performInitialSync() {
                 }
             }
 
-            self.notifyDataUpdated()
-            
-            logger.debug("Initial sync completed")
-            
             DispatchQueue.main.async {
                 self.isSyncing = false
+                self.notifyDataUpdated()
+                self.logger.debug("Initial sync completed")
             }
         }
     }
@@ -292,6 +338,7 @@ func performInitialSync() {
 
         Task {
             var lastError: Error? = nil
+            var importedCount = 0
 
             for toolId in adapterRegistry.getAllToolIds() {
                 guard let syncService = syncServices[toolId] else {
@@ -302,10 +349,11 @@ func performInitialSync() {
 
                 do {
                     let progress = try await syncService.syncDirectory(at: dataDirectory, toolId: toolId)
+                    importedCount += progress.importedFiles
 
                     DispatchQueue.main.async {
                         self.syncProgress = progress
-                        self.lastSyncTime = Date()
+                        self.lastSyncTime = (syncService as? OpenCodeDatabaseSyncService).map { $0.lastCompleteSync } ?? Date()
                     }
 
                     updateToolSyncState(toolId: toolId, error: nil)
@@ -315,9 +363,9 @@ func performInitialSync() {
                 }
             }
 
-            if let aggregationService = self.aggregationService {
+            if importedCount > 0 {
                 do {
-                    try aggregationService.rebuildAllAggregations()
+                    try self.rebuildAggregations()
                     self.logger.info("定时同步后聚合完成")
                 } catch {
                     self.logger.error("定时同步后聚合失败: \(error)")
@@ -330,10 +378,11 @@ func performInitialSync() {
                 }
             }
 
-            self.notifyDataUpdated()
-
             DispatchQueue.main.async {
                 self.isSyncing = false
+                if importedCount > 0 {
+                    self.notifyDataUpdated()
+                }
             }
         }
     }
@@ -344,60 +393,9 @@ func performInitialSync() {
         syncError = nil
 
         Task {
-            var tempBackup: BackupInfo? = nil
-            var lastError: Error? = nil
-
             do {
-                if let backupManager = backupManager {
-                    tempBackup = try await backupManager.createBackup(from: DatabaseRepository.shared.dbPool(), kind: .system)
-                }
-
-                try await databaseResetter()
-
-                for toolId in adapterRegistry.getAllToolIds() {
-                    guard let syncService = syncServices[toolId] else { continue }
-
-                    let dataDirectory = fullSyncDataDirectoryProvider(toolId)
-                    do {
-                        let progress = try await syncService.syncDirectory(at: dataDirectory, toolId: toolId)
-
-                        DispatchQueue.main.async {
-                            self.syncProgress = progress
-                            self.lastSyncTime = Date()
-                        }
-                        updateToolSyncState(toolId: toolId, error: nil)
-                    } catch {
-                        lastError = error
-                        logger.error("Tool \(toolId) full sync failed: \(error.localizedDescription)")
-                        updateToolSyncState(toolId: toolId, error: error)
-                    }
-                }
-
-                if let aggregationService = self.aggregationService {
-                    do {
-                        try aggregationService.rebuildAllAggregations()
-                        self.logger.info("全量同步后聚合完成")
-                    } catch {
-                        self.logger.error("全量同步后聚合失败: \(error)")
-                    }
-                }
-
-                if let backupManager = backupManager, let backup = tempBackup {
-                    try await backupManager.deleteBackup(backup)
-                }
-
-            if let lastError = lastError {
-                DispatchQueue.main.async {
-                    self.syncError = lastError
-                }
-            }
-
-            self.notifyDataUpdated()
+                try await executeFullSync()
             } catch {
-                if let backupManager = backupManager, let backup = tempBackup {
-                    try? await backupManager.restoreBackup(backup, to: DatabaseRepository.shared.dbPool())
-                }
-
                 DispatchQueue.main.async {
                     self.syncError = error
                 }
@@ -406,6 +404,54 @@ func performInitialSync() {
             DispatchQueue.main.async {
                 self.isSyncing = false
             }
+        }
+    }
+
+    internal func executeFullSync() async throws {
+        // Detect before any reset. V2 owns an atomic reconcile and must retain
+        // historic V1 accounting until the source import has been reconciled.
+        if let source = syncServices["opencode"] as? OpenCodeDatabaseSyncService {
+            let queue = try source.openSource()
+            let format: OpenCodeDatabaseFormat
+            do { format = try await queue.read { try OpenCodeDatabaseFormat.detect(in: $0) } }
+            catch {
+                _ = try await source.syncDirectory(at: fullSyncDataDirectoryProvider("opencode"), toolId: "opencode")
+                throw error
+            }
+            if format == .v2 {
+                let progress = try await source.resynchronize()
+                await MainActor.run {
+                    self.syncProgress = progress
+                    self.lastSyncTime = source.lastCompleteSync
+                    self.notifyDataUpdated()
+                }
+                return
+            }
+        }
+        try await createFullSyncBackup()
+        do {
+            try await databaseResetter()
+            for toolId in adapterRegistry.getAllToolIds() {
+                guard let syncService = syncServices[toolId] else {
+                    throw SyncError.databaseError(NSError(domain: "SyncCoordinator", code: 1, userInfo: [NSLocalizedDescriptionKey: "Sync service not found for \(toolId)"]))
+                }
+                let progress = try await syncService.syncDirectory(at: fullSyncDataDirectoryProvider(toolId), toolId: toolId)
+                DispatchQueue.main.async {
+                    self.syncProgress = progress
+                    self.lastSyncTime = (syncService as? OpenCodeDatabaseSyncService).map { $0.lastCompleteSync } ?? Date()
+                }
+                updateToolSyncState(toolId: toolId, error: nil)
+            }
+            try rebuildFullSyncAggregations()
+            try await deleteFullSyncBackup()
+            notifyDataUpdated()
+        } catch {
+            do {
+                try await restoreFullSyncBackup()
+            } catch let restoreError {
+                logger.error("Full sync rollback failed: \(restoreError.localizedDescription)")
+            }
+            throw error
         }
     }
     
@@ -488,7 +534,7 @@ func performInitialSync() {
                     if importedCount > 0 {
                         hasDataChanged = true
 
-                        if !affectedSessionIds.isEmpty {
+                        if !affectedSessionIds.isEmpty && (syncService as? OpenCodeDatabaseSyncService)?.usesV2 != true {
                             try sessionService(for: toolId).recalculateSessions(for: affectedSessionIds)
 
                             // 增量聚合更新
@@ -531,7 +577,7 @@ func performInitialSync() {
         let syncService = syncServices[toolId] ?? createSyncService(for: toolId, parser: parser)
         let (importedCount, affectedSessionIds, _) = try await syncService.syncFile(at: url, toolId: toolId)
 
-        if importedCount > 0 && !affectedSessionIds.isEmpty {
+        if importedCount > 0 && !affectedSessionIds.isEmpty && (syncService as? OpenCodeDatabaseSyncService)?.usesV2 != true {
             try sessionService(for: toolId).recalculateSessions(for: affectedSessionIds)
 
             // 增量聚合更新
@@ -580,7 +626,13 @@ func performInitialSync() {
     private func updateToolSyncState(toolId: String, error: Error?) {
         DispatchQueue.main.async {
             var state = self.toolSyncStates[toolId] ?? ToolSyncState(toolId: toolId)
-            state.lastSyncTime = Date()
+            if error == nil {
+                if let source = self.syncServices[toolId] as? OpenCodeDatabaseSyncService {
+                    state.lastSyncTime = source.lastCompleteSync
+                } else {
+                    state.lastSyncTime = Date()
+                }
+            }
             state.syncError = error
             state.isSyncing = false
             self.toolSyncStates[toolId] = state
@@ -613,7 +665,9 @@ func performInitialSync() {
             sessionService: SessionService(dbPool: DatabaseRepository.shared.dbPool()),
             parser: OpenCodeMessageParser()
         )
+        stopFileWatcher()
         applySyncStrategy(syncStrategyProvider())
+        performInitialSync()
     }
 }
 

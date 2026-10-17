@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 
 /// Manages the menu bar status item for VibeWave
+@MainActor
 public final class StatusItemManager {
 
     // MARK: - Singleton
@@ -21,8 +22,8 @@ public final class StatusItemManager {
     // MARK: - Initialization
 
     private init() {
+        _ = NSApplication.shared
         setupStatusItem()
-        setupPopupWindow()
     }
 
     // MARK: - Setup
@@ -35,10 +36,6 @@ public final class StatusItemManager {
             button.action = #selector(handleStatusItemClick)
             button.target = self
         }
-    }
-
-    private func setupPopupWindow() {
-        popupWindow = MenuBarPopupWindow(statusItem: statusItem)
     }
 
     // MARK: - Click Handling
@@ -55,6 +52,9 @@ public final class StatusItemManager {
         if isActuallyVisible {
             popupWindow?.close()
         } else {
+            if popupWindow == nil {
+                popupWindow = MenuBarPopupWindow(statusItem: statusItem)
+            }
             popupWindow?.show()
         }
     }

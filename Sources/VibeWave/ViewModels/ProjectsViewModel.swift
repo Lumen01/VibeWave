@@ -25,7 +25,7 @@ public final class ProjectsViewModel: ObservableObject {
   private var needsRefreshOnNextAppear: Bool = false
   
   public struct ProjectStats: Identifiable, Equatable {
-    public let id = UUID()
+    public var id: String { projectRoot }
     public let projectRoot: String
     public let sessionCount: Int
     public let messageCount: Int
@@ -56,9 +56,6 @@ public final class ProjectsViewModel: ObservableObject {
       self.lastActiveAt = lastActiveAt
     }
     
-    public static func == (lhs: ProjectStats, rhs: ProjectStats) -> Bool {
-      lhs.id == rhs.id
-    }
   }
   
   public init(dbPool: DatabasePool, notificationCenter: NotificationCenter = .default) {
@@ -112,7 +109,10 @@ public final class ProjectsViewModel: ObservableObject {
         self.projectStats = projectStats
 
         if let selected = self.selectedProject {
-          self.loadProjectActivity(projectRoot: selected.projectRoot)
+          self.selectedProject = projectStats.first { $0.projectRoot == selected.projectRoot }
+          if let selectedProject = self.selectedProject {
+            self.loadProjectActivity(projectRoot: selectedProject.projectRoot)
+          }
         }
       }
     }

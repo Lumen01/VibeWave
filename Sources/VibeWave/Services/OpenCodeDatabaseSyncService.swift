@@ -8,6 +8,10 @@ public final class OpenCodeDatabaseSyncService: SyncServiceProtocol {
     private let messageRepo: MessageRepository
     private let sessionService: SessionService
     private let parser: MessageParsing
+    private let report: (OpenCodeSourceState) -> Void
+    private let syncLock = NSLock()
+    private(set) var usesV2 = false
+    private(set) var lastCompleteSync: Date?
 
     public init(
         sourceDatabaseURL: URL,
@@ -15,7 +19,8 @@ public final class OpenCodeDatabaseSyncService: SyncServiceProtocol {
         syncMetadataRepo: SyncMetadataRepository,
         messageRepo: MessageRepository,
         sessionService: SessionService,
-        parser: MessageParsing
+        parser: MessageParsing,
+        report: @escaping (OpenCodeSourceState) -> Void = { OpenCodeSourceStatus.shared.report($0) }
     ) {
         self.sourceDatabaseURL = sourceDatabaseURL
         self.dbPool = dbPool
@@ -23,10 +28,19 @@ public final class OpenCodeDatabaseSyncService: SyncServiceProtocol {
         self.messageRepo = messageRepo
         self.sessionService = sessionService
         self.parser = parser
+        self.report = report
     }
 
     public func syncDirectory(at url: URL, toolId: String) async throws -> SyncProgress {
-        let result = try syncDatabase(toolId: toolId)
+        try performDirectorySync(toolId: toolId, force: false)
+    }
+
+    func resynchronize() async throws -> SyncProgress {
+        try performDirectorySync(toolId: "opencode", force: true)
+    }
+
+    private func performDirectorySync(toolId: String, force: Bool) throws -> SyncProgress {
+        let result = try syncDatabase(toolId: toolId, force: force)
         if result.importedCount > 0 {
             return SyncProgress(
                 totalFiles: 1,
@@ -67,12 +81,61 @@ private extension OpenCodeDatabaseSyncService {
         let affectedSessionIds: Set<String>
     }
 
-    func syncDatabase(toolId: String) throws -> SyncResult {
+    func syncDatabase(toolId: String, force: Bool = false) throws -> SyncResult {
+        syncLock.lock()
+        defer { syncLock.unlock() }
+        let prior = syncMetadataRepo.fetch(filePath: sourceDatabaseURL.path + "#v2")
+            ?? syncMetadataRepo.fetch(filePath: sourceDatabaseURL.path)
+        let lastSuccess = prior.map { Date(timeIntervalSince1970: Double($0.lastImportedAt) / 1000) }
+        lastCompleteSync = lastSuccess
+        do {
+            let sourceQueue = try openSource()
+            let format = try sourceQueue.read { try OpenCodeDatabaseFormat.detect(in: $0) }
+            usesV2 = format == .v2
+            if usesV2 {
+                let result = try OpenCodeV2SyncService(pool: dbPool, path: sourceDatabaseURL.path, report: report).sync(source: sourceQueue, force: force)
+                if result.incompleteCount == 0 {
+                    lastCompleteSync = syncMetadataRepo.fetch(filePath: sourceDatabaseURL.path + "#v2")
+                        .map { Date(timeIntervalSince1970: Double($0.lastImportedAt) / 1000) }
+                }
+                return SyncResult(importedCount: result.changedCount, affectedSessionIds: result.affectedSessions)
+            }
+            // Once a source has switched to V2, a V1-looking replacement is not a
+            // valid reason to resume the obsolete reader or overwrite its history.
+            if syncMetadataRepo.fetch(filePath: sourceDatabaseURL.path + "#v2") != nil {
+                throw OpenCodeSourceError.unsupportedSchema
+            }
+            let result = try syncV1Database(sourceQueue: sourceQueue, toolId: toolId)
+            lastCompleteSync = Date()
+            report(OpenCodeSourceState(kind: .v1, lastSuccess: lastCompleteSync))
+            return result
+        } catch {
+            let kind: OpenCodeSourceState.Kind
+            switch error {
+            case OpenCodeSourceError.unsupportedSchema, OpenCodeSourceError.invalidRecord:
+                kind = .updateRequired
+            case OpenCodeSourceError.migrationInProgress: kind = .waiting
+            default: kind = .failed
+            }
+            report(OpenCodeSourceState(kind: kind, lastSuccess: lastSuccess))
+            throw error
+        }
+    }
+
+    internal func openSource() throws -> DatabaseQueue {
+        guard FileManager.default.fileExists(atPath: sourceDatabaseURL.path) else {
+            throw SyncError.databaseNotFound(sourceDatabaseURL.path)
+        }
+        var configuration = Configuration()
+        configuration.readonly = true
+        return try DatabaseQueue(path: sourceDatabaseURL.path, configuration: configuration)
+    }
+
+    func syncV1Database(sourceQueue: DatabaseQueue, toolId: String) throws -> SyncResult {
         guard FileManager.default.fileExists(atPath: sourceDatabaseURL.path) else {
             throw SyncError.databaseNotFound(sourceDatabaseURL.path)
         }
 
-        let sourceQueue = try DatabaseQueue(path: sourceDatabaseURL.path)
         let metadataKey = sourceDatabaseURL.path
         let existing = syncMetadataRepo.fetch(filePath: metadataKey)
         var cursorUpdated = existing?.lastMessageTime ?? 0
@@ -107,10 +170,11 @@ private extension OpenCodeDatabaseSyncService {
                       let timeUpdated = row["time_updated"] as? Int64,
                       let payloadData = payload.data(using: .utf8),
                       let enrichedData = enrichMessageData(payloadData, messageId: messageId, sessionId: sessionId) else {
-                    continue
+                    throw OpenCodeSourceError.invalidRecord
                 }
 
                 let parseResult = parser.parseMessages(from: enrichedData, sourceURL: sourceDatabaseURL)
+                if let error = parseResult.error { throw error }
                 if !parseResult.messages.isEmpty {
                     messagesToInsert.append(contentsOf: parseResult.messages)
                     affectedSessionIds.formUnion(parseResult.affectedSessionIds)

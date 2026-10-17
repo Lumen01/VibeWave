@@ -14,49 +14,44 @@ public final class AggregationService {
         let startTime = Date()
 
         try dbPool.write { db in
-            try db.execute(sql: "DELETE FROM hourly_stats")
-            try db.execute(sql: "DELETE FROM daily_stats")
-            try db.execute(sql: "DELETE FROM monthly_stats")
-        }
-
-        let timeRange = try dbPool.read { db -> (min: Int64, max: Int64)? in
-            let row = try Row.fetchOne(db, sql: "SELECT MIN(created_at) as min_time, MAX(created_at) as max_time FROM messages")
-            guard let minTime = row?["min_time"] as? Int64,
-                  let maxTime = row?["max_time"] as? Int64 else {
-                return nil
-            }
-            return (min: minTime, max: maxTime)
-        }
-
-        guard let range = timeRange else {
-            logger.info("没有消息数据，跳过聚合")
-            return
-        }
-
-        let hourlyMin = Self.calculateHourlyBucket(timestampMs: range.min)
-        let hourlyMax = Self.calculateHourlyBucket(timestampMs: range.max) + TimeGranularity.hourly.bucketIntervalMs
-        let dailyMin = Self.calculateDailyBucket(timestampMs: range.min)
-        let dailyMax = Self.calculateDailyBucket(timestampMs: range.max) + TimeGranularity.daily.bucketIntervalMs
-        let monthlyMin = Self.calculateMonthlyBucket(timestampMs: range.min)
-        let monthlyMax = Self.calculateNextMonthlyBucket(timestampMs: range.max)
-
-        try dbPool.write { db in
-            try db.execute(
-                sql: Self.hourlyAggregationSQL,
-                arguments: [hourlyMin, hourlyMax]
-            )
-            try db.execute(
-                sql: Self.dailyAggregationSQL,
-                arguments: [dailyMin, dailyMax]
-            )
-            try db.execute(
-                sql: Self.monthlyAggregationSQL,
-                arguments: [monthlyMin, monthlyMax]
-            )
+            try rebuildAllAggregations(in: db)
         }
 
         let duration = Date().timeIntervalSince(startTime)
         logger.info("聚合完成: 耗时 \(String(format: "%.2f", duration))s")
+    }
+
+    func rebuildAllAggregations(in db: Database) throws {
+        try db.execute(sql: "DELETE FROM hourly_stats")
+        try db.execute(sql: "DELETE FROM daily_stats")
+        try db.execute(sql: "DELETE FROM monthly_stats")
+
+        let row = try Row.fetchOne(db, sql: "SELECT MIN(created_at) as min_time, MAX(created_at) as max_time FROM messages")
+        guard let minTime = row?["min_time"] as? Int64,
+              let maxTime = row?["max_time"] as? Int64 else {
+            logger.info("没有消息数据，跳过聚合")
+            return
+        }
+
+        let hourlyMin = Self.calculateHourlyBucket(timestampMs: minTime)
+        let hourlyMax = Self.calculateHourlyBucket(timestampMs: maxTime) + TimeGranularity.hourly.bucketIntervalMs
+        let dailyMin = Self.calculateDailyBucket(timestampMs: minTime)
+        let dailyMax = Self.calculateDailyBucket(timestampMs: maxTime) + TimeGranularity.daily.bucketIntervalMs
+        let monthlyMin = Self.calculateMonthlyBucket(timestampMs: minTime)
+        let monthlyMax = Self.calculateNextMonthlyBucket(timestampMs: maxTime)
+
+        try db.execute(
+            sql: Self.hourlyAggregationSQL,
+            arguments: [hourlyMin, hourlyMax]
+        )
+        try db.execute(
+            sql: Self.dailyAggregationSQL,
+            arguments: [dailyMin, dailyMax]
+        )
+        try db.execute(
+            sql: Self.monthlyAggregationSQL,
+            arguments: [monthlyMin, monthlyMax]
+        )
     }
 
     public func recalculateAffectedAggregations(for sessionIds: Set<String>) throws {
@@ -84,43 +79,8 @@ public final class AggregationService {
             return
         }
 
-        let expandedMin = Self.calculateHourlyBucket(timestampMs: range.min)
-        let expandedMax = Self.calculateHourlyBucket(timestampMs: range.max) + TimeGranularity.hourly.bucketIntervalMs
-
         try dbPool.write { db in
-            try db.execute(
-                sql: "DELETE FROM hourly_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
-                arguments: [expandedMin, expandedMax]
-            )
-
-            try db.execute(
-                sql: Self.hourlyAggregationSQL,
-                arguments: [expandedMin, expandedMax]
-            )
-
-            let dailyMin = Self.calculateDailyBucket(timestampMs: range.min)
-            let dailyMax = Self.calculateDailyBucket(timestampMs: range.max) + TimeGranularity.daily.bucketIntervalMs
-
-            try db.execute(
-                sql: "DELETE FROM daily_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
-                arguments: [dailyMin, dailyMax]
-            )
-            try db.execute(
-                sql: Self.dailyAggregationSQL,
-                arguments: [dailyMin, dailyMax]
-            )
-
-            let monthlyMin = Self.calculateMonthlyBucket(timestampMs: range.min)
-            let monthlyMax = Self.calculateNextMonthlyBucket(timestampMs: range.max)
-
-            try db.execute(
-                sql: "DELETE FROM monthly_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
-                arguments: [monthlyMin, monthlyMax]
-            )
-            try db.execute(
-                sql: Self.monthlyAggregationSQL,
-                arguments: [monthlyMin, monthlyMax]
-            )
+            try recalculateAggregations(from: range.min, to: range.max, in: db)
         }
 
         logger.debug("受影响聚合重新计算完成")
@@ -151,6 +111,44 @@ public final class AggregationService {
         let nextMonth = calendar.date(byAdding: .month, value: 1, to: startDate)!
         return Int64(nextMonth.timeIntervalSince1970 * 1000)
     }
+    func recalculateAggregations(from minimum: Int64, to maximum: Int64, in db: Database) throws {
+        let expandedMin = Self.calculateHourlyBucket(timestampMs: minimum)
+        let expandedMax = Self.calculateHourlyBucket(timestampMs: maximum) + TimeGranularity.hourly.bucketIntervalMs
+        try db.execute(
+            sql: "DELETE FROM hourly_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
+            arguments: [expandedMin, expandedMax]
+        )
+
+        try db.execute(
+            sql: Self.hourlyAggregationSQL,
+            arguments: [expandedMin, expandedMax]
+        )
+
+        let dailyMin = Self.calculateDailyBucket(timestampMs: minimum)
+        let dailyMax = Self.calculateDailyBucket(timestampMs: maximum) + TimeGranularity.daily.bucketIntervalMs
+
+        try db.execute(
+            sql: "DELETE FROM daily_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
+            arguments: [dailyMin, dailyMax]
+        )
+        try db.execute(
+            sql: Self.dailyAggregationSQL,
+            arguments: [dailyMin, dailyMax]
+        )
+
+        let monthlyMin = Self.calculateMonthlyBucket(timestampMs: minimum)
+        let monthlyMax = Self.calculateNextMonthlyBucket(timestampMs: maximum)
+
+        try db.execute(
+            sql: "DELETE FROM monthly_stats WHERE time_bucket_ms >= ? AND time_bucket_ms < ?",
+            arguments: [monthlyMin, monthlyMax]
+        )
+        try db.execute(
+            sql: Self.monthlyAggregationSQL,
+            arguments: [monthlyMin, monthlyMax]
+        )
+    }
+
 }
 
 private extension AggregationService {
@@ -170,7 +168,7 @@ private extension AggregationService {
             COALESCE(m.agent, 'unknown') as agent,
             COALESCE(m.tool_id, 'opencode') as tool_id,
             COUNT(DISTINCT m.session_id) as session_count,
-            COUNT(*) as message_count,
+            COUNT(CASE WHEN m.role IN ('user', 'assistant') THEN 1 END) as message_count,
             COALESCE(SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)), 0) as input_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)), 0) as output_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)), 0) as reasoning_tokens,
@@ -226,7 +224,7 @@ private extension AggregationService {
             COALESCE(m.agent, 'unknown') as agent,
             COALESCE(m.tool_id, 'opencode') as tool_id,
             COUNT(DISTINCT m.session_id) as session_count,
-            COUNT(*) as message_count,
+            COUNT(CASE WHEN m.role IN ('user', 'assistant') THEN 1 END) as message_count,
             COALESCE(SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)), 0) as input_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)), 0) as output_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)), 0) as reasoning_tokens,
@@ -282,7 +280,7 @@ private extension AggregationService {
             COALESCE(m.agent, 'unknown') as agent,
             COALESCE(m.tool_id, 'opencode') as tool_id,
             COUNT(DISTINCT m.session_id) as session_count,
-            COUNT(*) as message_count,
+            COUNT(CASE WHEN m.role IN ('user', 'assistant') THEN 1 END) as message_count,
             COALESCE(SUM(CAST(COALESCE(m.token_input, '0') AS INTEGER)), 0) as input_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_output, '0') AS INTEGER)), 0) as output_tokens,
             COALESCE(SUM(CAST(COALESCE(m.token_reasoning, '0') AS INTEGER)), 0) as reasoning_tokens,

@@ -5,144 +5,152 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: macos-latest
     permissions:
       contents: write
-    
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      build_number: ${{ github.run_number }}
-    
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+      GH_TOKEN: ${{ github.token }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
-      
-      - name: Extract Version and Tag Context
-        id: version
+
+      - name: 核对版本与发布提交
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            TAG_NAME="${GITHUB_REF#refs/tags/}"
-            VERSION="${TAG_NAME#v}"
-          else
-            git fetch --tags --force
-            TAG_NAME="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")"
-            VERSION="${TAG_NAME#v}"
+          VERSION="$(cat .version)"
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "版本必须使用 major.minor.patch 格式"
+            exit 1
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          echo "📦 Building version: $VERSION from tag: $TAG_NAME"
-      
-      - name: Save Version
-        run: echo "${{ steps.version.outputs.version }}" > .version
-      
-      - name: Build
-        run: |
-          chmod +x run-app.sh
-          ./run-app.sh --build
-          ls -la .build/debug/
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if [[ "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+              echo "发布标签必须与 .version 一致"
+              exit 1
+            fi
+            if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+              echo "正式发布标签必须指向当前 main 提交"
+              exit 1
+            fi
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
 
-      - name: Smoke Test Launch
+      - name: 运行受影响范围的回归测试
+        run: >-
+          swift test --filter
+          'OpenCodeV2SyncTests|OpenCodeDatabaseSyncServiceTests|OpenCodeConnectionPresentationTests|SyncCoordinatorTests|SyncCoordinatorFileWatcherPathTests|SyncStrategyToggleTests|FileWatcherRecursiveTests|IncrementalSyncServiceTests|SessionServiceTests|DatabaseMigrationServiceTests|DatabaseRepositoryTests|ProjectsViewModelTests|StatusItemManagerTests|AppLoggerTests|LogLevelSettingsTests|SettingsAutoSaveTests|AgentDistributionTests|ModelProcessingStatsTests|InsightsRepositoryTests|InsightsAnomalyTests'
+
+      - name: 构建正式版本
         run: |
-          APP_BIN=".build/debug/VibeWave.app/Contents/MacOS/VibeWave"
+          ./run-app.sh --build --release
+          APP_PATH="$(swift build -c release --show-bin-path)/VibeWave.app"
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          export APP_PATH
+          codesign --verify --deep --strict "$APP_PATH"
+          python3 - <<'PY'
+          import os, plistlib, subprocess
+          from pathlib import Path
+          info = plistlib.loads((Path(os.environ['APP_PATH']) / 'Contents/Info.plist').read_bytes())
+          assert info['CFBundleShortVersionString'] == os.environ['VERSION']
+          assert info['CFBundleVersion'] == os.environ['BUILD_NUMBER']
+          assert info['VibeWaveBuildConfiguration'] == 'release'
+          assert info['VibeWaveSourceRevision'] == subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], text=True).strip()
+          assert info['VibeWaveSourceRef'] == os.environ['GITHUB_REF_NAME']
+          PY
+
+      - name: 检查正式包能否启动
+        run: |
           LOG_FILE="$(mktemp)"
-
-          "$APP_BIN" > "$LOG_FILE" 2>&1 &
+          "$APP_PATH/Contents/MacOS/VibeWave" > "$LOG_FILE" 2>&1 &
           APP_PID=$!
           sleep 3
-
           if ! kill -0 "$APP_PID" 2>/dev/null; then
-            echo "ERROR: App exited unexpectedly during smoke test"
+            echo "App 启动后异常退出"
             cat "$LOG_FILE"
             exit 1
           fi
-
-          kill "$APP_PID" 2>/dev/null || true
-          wait "$APP_PID" 2>/dev/null || true
-
+          kill "$APP_PID"
+          wait "$APP_PID" || true
           if grep -q "could not load resource bundle" "$LOG_FILE"; then
-            echo "ERROR: Resource bundle lookup failed"
             cat "$LOG_FILE"
             exit 1
           fi
-      
-      - name: Package
+
+      - name: 打包与生成构建记录
         run: |
-          APP_PATH=".build/debug/VibeWave.app"
-          if [ -d "$APP_PATH" ]; then
-            ditto -c -k --keepParent "$APP_PATH" "VibeWave-${{ steps.version.outputs.version }}.zip"
-            ls -la VibeWave-*.zip
-          else
-            echo "ERROR: App bundle not found at $APP_PATH"
-            exit 1
-          fi
-      
-      - name: Upload Artifact
+          ARCH="$(uname -m)"
+          ASSET_NAME="VibeWave-${VERSION}-build.${BUILD_NUMBER}-macOS-${ARCH}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ASSET_NAME"
+          shasum -a 256 "$ASSET_NAME" > SHA256SUMS
+          echo "ASSET_NAME=$ASSET_NAME" >> "$GITHUB_ENV"
+          export ARCH ASSET_NAME
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          record = {
+              'version': os.environ['VERSION'],
+              'build': os.environ['BUILD_NUMBER'],
+              'configuration': 'release',
+              'sourceRef': os.environ['GITHUB_REF_NAME'],
+              'sourceRevision': os.environ['GITHUB_SHA'],
+              'architecture': os.environ['ARCH'],
+              'minimumMacOS': '14.0',
+              'asset': os.environ['ASSET_NAME'],
+              'workflowRun': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          Path('build-info.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+
+      - name: 保存构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: VibeWave-${{ steps.version.outputs.version }}
-          path: VibeWave-${{ steps.version.outputs.version }}.zip
-      
-      - name: Create Release
+          name: ${{ env.ASSET_NAME }}
+          path: |
+            ${{ env.ASSET_NAME }}
+            SHA256SUMS
+            build-info.json
+          if-no-files-found: error
+
+      - name: 自动发布正式版本
         if: github.ref_type == 'tag'
         run: |
-          TAG="${{ steps.version.outputs.tag_name }}"
-          VERSION="${{ steps.version.outputs.version }}"
-
-          TAG_MESSAGE="$(git for-each-ref "refs/tags/$TAG" --format='%(contents)' 2>/dev/null || true)"
-          if [[ -z "${TAG_MESSAGE// /}" ]]; then
-            TAG_MESSAGE="No annotated tag notes found for $TAG."
-          fi
-
+          TAG="$GITHUB_REF_NAME"
+          TAG_MESSAGE="$(git for-each-ref "refs/tags/$TAG" --format='%(contents)')"
           PREV_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)"
           if [[ -n "$PREV_TAG" ]]; then
             CHANGE_RANGE="${PREV_TAG}..${TAG}"
-            CHANGES="$(git log --no-merges --pretty='- %s (%h)' "$CHANGE_RANGE")"
           else
             CHANGE_RANGE="$TAG"
-            CHANGES="$(git log --no-merges --pretty='- %s (%h)' "$TAG")"
           fi
-
-          if [[ -z "${CHANGES// /}" ]]; then
-            CHANGES="- No commit-level changes detected."
-          fi
-
+          CHANGES="$(git log --no-merges --pretty='- %s (%h)' "$CHANGE_RANGE")"
           cat > RELEASE_NOTES.md <<EOF
-          ## VibeWave ${VERSION} (Build ${{ github.run_number }})
+          ## VibeWave ${VERSION}（构建 ${BUILD_NUMBER}）
 
-          ### Release Notes
           ${TAG_MESSAGE}
 
-          ---
-
-          ### Changes (${CHANGE_RANGE})
+          ### 提交记录（${CHANGE_RANGE}）
           ${CHANGES}
 
-          ---
-
-          ### Download
-          - 📦 [VibeWave-${VERSION}.zip](https://github.com/${{ github.repository }}/releases/download/${TAG}/VibeWave-${VERSION}.zip)
-
-          ### Install
-          1. Download and extract ZIP
-          2. Drag VibeWave.app to Applications folder
-          3. First launch may require right-click and "Open"
+          ### 下载与安装
+          - [${ASSET_NAME}](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ASSET_NAME})
+          - 解压后将 VibeWave.app 放入 Applications，替换旧版应用。
+          - 适用于 macOS 14 及以上；处理器架构见文件名。
+          - 本地临时签名，尚未公证；首次运行可右键选择“打开”。
+          - SHA256SUMS 用于校验下载文件；build-info.json 记录版本、构建号和源码提交。
           EOF
-          
-          # Check if release exists, edit it; otherwise create new
-          if gh release view "$TAG" &>/dev/null; then
-            gh release edit "$TAG" --title "VibeWave ${VERSION}" --notes-file RELEASE_NOTES.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET_NAME" SHA256SUMS build-info.json --clobber
+            gh release edit "$TAG" --title "VibeWave ${VERSION} (Build ${BUILD_NUMBER})" --notes-file RELEASE_NOTES.md --latest
           else
-            gh release create "$TAG" --title "VibeWave ${VERSION}" --notes-file RELEASE_NOTES.md
+            gh release create "$TAG" "$ASSET_NAME" SHA256SUMS build-info.json --verify-tag --title "VibeWave ${VERSION} (Build ${BUILD_NUMBER})" --notes-file RELEASE_NOTES.md --latest
           fi
-          
-          # Upload asset (overwrite if exists)
-          gh release upload "$TAG" "VibeWave-${VERSION}.zip" --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
