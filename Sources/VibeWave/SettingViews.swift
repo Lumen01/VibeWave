@@ -519,13 +519,6 @@ public struct SettingsView: View {
       .padding()
     }
     .navigationTitle(L10n.navSettings)
-    .toolbar {
-      ToolbarItem(placement: .navigation) {
-        Text(L10n.appName)
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundColor(.primary)
-      }
-    }
     .animation(.default, value: settingsViewModel.operationStatus)
     .animation(.default, value: settingsViewModel.backupEnabled)
     .onReceive(NotificationCenter.default.publisher(for: .showSettingsAbout)) { _ in
