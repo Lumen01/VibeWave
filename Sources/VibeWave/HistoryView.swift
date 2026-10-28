@@ -59,11 +59,6 @@ public struct HistoryView: View {
         }
         .navigationTitle(L10n.navHistory)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Text("VibeWave")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
             ToolbarItem(placement: .primaryAction) {
                 Picker("", selection: $viewModel.selectedTimeRange) {
                     ForEach(HistoryTimeRangeOption.allCases, id: \.self) { option in

@@ -36,11 +36,6 @@ public struct OverviewView: View {
         }
         .navigationTitle(L10n.navOverview)
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Text("VibeWave")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
             ToolbarItem(placement: .primaryAction) {
                 timeRangePicker
             }
