@@ -18,13 +18,6 @@ public struct InsightsView: View {
             .padding()
         }
         .navigationTitle(L10n.navInsights)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Text("VibeWave")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
-        }
         .onAppear {
             viewModel.loadIfNeeded()
         }

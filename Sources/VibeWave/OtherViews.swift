@@ -21,13 +21,6 @@ public struct ProjectsView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.selectedProject)
     .navigationTitle(L10n.projectProjectList)
-    .toolbar {
-      ToolbarItem(placement: .navigation) {
-        Text("VibeWave")
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundColor(.primary)
-      }
-    }
     .onAppear {
       viewModel.setVisible(true)
       viewModel.loadIfNeeded()
