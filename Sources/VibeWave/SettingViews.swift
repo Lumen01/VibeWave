@@ -74,6 +74,20 @@ public struct SettingsView: View {
     .padding(.horizontal, 16)
   }
 
+  private func settingsRow(title: String, @ViewBuilder content: () -> some View) -> some View {
+    HStack(spacing: 16) {
+      Text(title)
+        .font(.subheadline)
+        .fixedSize(horizontal: false, vertical: true)
+        .layoutPriority(1)
+      Spacer(minLength: 0)
+      content()
+        .labelsHidden()
+        .frame(maxWidth: 360, alignment: .trailing)
+    }
+    .frame(maxWidth: .infinity)
+  }
+
   private var settingsSyncStrategySliderRange: ClosedRange<Double> {
     0...Double(max(0, SyncStrategy.sliderOptions.count - 1))
   }
@@ -94,14 +108,14 @@ public struct SettingsView: View {
     VStack(alignment: .leading, spacing: 16) {
       OpenCodeConnectionStatusView(alwaysVisible: true)
       VStack(alignment: .leading, spacing: 8) {
-        Text(L10n.settingsDataSource)
-          .font(.subheadline)
-
-        TextField(L10n.settingsDataSourcePath, text: $settingsViewModel.dataSourcePath)
-          .textFieldStyle(.roundedBorder)
-          .help(L10n.settingsDataSourceHelp)
+        settingsRow(title: L10n.settingsDataSource) {
+          TextField(L10n.settingsDataSourcePath, text: $settingsViewModel.dataSourcePath)
+            .textFieldStyle(.roundedBorder)
+            .help(L10n.settingsDataSourceHelp)
+        }
 
         HStack(spacing: 10) {
+          Spacer(minLength: 0)
           Button(L10n.settingsChoosePath) {
             settingsViewModel.chooseDataSourcePath()
           }
@@ -119,16 +133,15 @@ public struct SettingsView: View {
       }
 
       VStack(alignment: .leading, spacing: 8) {
-        Text(L10n.settingsSyncStrategy)
-          .font(.subheadline)
-        
-        Picker(L10n.settingsSyncStrategy, selection: $settingsViewModel.syncStrategy) {
-          ForEach(SyncStrategy.allCases, id: \.self) { strategy in
-            Text(strategy.displayName).tag(strategy)
+        settingsRow(title: L10n.settingsSyncStrategy) {
+          Picker(L10n.settingsSyncStrategy, selection: $settingsViewModel.syncStrategy) {
+            ForEach(SyncStrategy.allCases, id: \.self) { strategy in
+              Text(strategy.displayName).tag(strategy)
+            }
           }
+          .pickerStyle(.segmented)
+          .help(L10n.settingsSyncStrategyHelp)
         }
-        .pickerStyle(.segmented)
-        .help(L10n.settingsSyncStrategyHelp)
         
         Text(settingsViewModel.syncStrategy.detailDescription)
           .font(.caption2)
@@ -142,9 +155,11 @@ public struct SettingsView: View {
   private var settingsBackupSectionContent: some View {
     VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
-        Toggle(L10n.settingsEnableBackup, isOn: $settingsViewModel.backupEnabled)
-          .toggleStyle(.switch)
-          .help(L10n.settingsEnableBackupHelp)
+        settingsRow(title: L10n.settingsEnableBackup) {
+          Toggle(L10n.settingsEnableBackup, isOn: $settingsViewModel.backupEnabled)
+            .toggleStyle(.switch)
+            .help(L10n.settingsEnableBackupHelp)
+        }
         Text(L10n.settingsBackupDescription)
           .font(.caption2)
           .foregroundColor(.secondary)
@@ -152,37 +167,47 @@ public struct SettingsView: View {
 
       if settingsViewModel.backupEnabled {
         VStack(alignment: .leading, spacing: 4) {
-          Stepper("\(L10n.settingsBackupRetention): \(settingsViewModel.backupRetentionCount)",
-                  value: $settingsViewModel.backupRetentionCount,
-                  in: 1...10)
+          settingsRow(title: L10n.settingsBackupRetention) {
+            HStack(spacing: 8) {
+              Text("\(settingsViewModel.backupRetentionCount)")
+                .monospacedDigit()
+              Stepper("\(L10n.settingsBackupRetention): \(settingsViewModel.backupRetentionCount)",
+                      value: $settingsViewModel.backupRetentionCount,
+                      in: 1...10)
+            }
+            .fixedSize()
+          }
           Text(L10n.settingsBackupRetentionHelp)
             .font(.caption2)
             .foregroundColor(.secondary)
         }
 
         VStack(alignment: .leading, spacing: 4) {
-          Picker(L10n.settingsBackupInterval, selection: $settingsViewModel.backupIntervalHours) {
-            Text(L10n.settingsBackupInterval6h).tag(6)
-            Text(L10n.settingsBackupInterval12h).tag(12)
-            Text(L10n.settingsBackupInterval24h).tag(24)
-            Text(L10n.settingsBackupInterval48h).tag(48)
+          settingsRow(title: L10n.settingsBackupInterval) {
+            Picker(L10n.settingsBackupInterval, selection: $settingsViewModel.backupIntervalHours) {
+              Text(L10n.settingsBackupInterval6h).tag(6)
+              Text(L10n.settingsBackupInterval12h).tag(12)
+              Text(L10n.settingsBackupInterval24h).tag(24)
+              Text(L10n.settingsBackupInterval48h).tag(48)
+            }
+            .pickerStyle(.segmented)
           }
-          .pickerStyle(.segmented)
           Text(L10n.settingsBackupIntervalHelp)
             .font(.caption2)
             .foregroundColor(.secondary)
         }
       }
 
-      VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 16) {
+        Text(L10n.settingsBackupNowHelp)
+          .font(.caption2)
+          .foregroundColor(.secondary)
+        Spacer(minLength: 0)
         Button {
           Task { await settingsViewModel.performBackupNow() }
         } label: {
           Label(L10n.settingsBackupNow, systemImage: "archivebox")
         }
-        Text(L10n.settingsBackupNowHelp)
-          .font(.caption2)
-          .foregroundColor(.secondary)
       }
 
       if settingsViewModel.availableBackups.count > 0 {
@@ -246,13 +271,15 @@ public struct SettingsView: View {
 
   private var settingsAppearanceSectionContent: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Picker(localizationManager.localizedString("settings.theme"), selection: $settingsViewModel.theme) {
-        ForEach(SettingsViewModel.AppTheme.allCases, id: \.self) { theme in
-          Text(theme.displayName).tag(theme)
+      settingsRow(title: localizationManager.localizedString("settings.theme")) {
+        Picker(localizationManager.localizedString("settings.theme"), selection: $settingsViewModel.theme) {
+          ForEach(SettingsViewModel.AppTheme.allCases, id: \.self) { theme in
+            Text(theme.displayName).tag(theme)
+          }
         }
+        .pickerStyle(.segmented)
+        .help(L10n.settingsThemeHelp)
       }
-      .pickerStyle(.segmented)
-      .help(L10n.settingsThemeHelp)
       Text(L10n.settingsThemeHelp)
         .font(.caption2)
         .foregroundColor(.secondary)
@@ -262,12 +289,15 @@ public struct SettingsView: View {
 
   private var settingsLanguageSectionContent: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Picker(localizationManager.localizedString("settings.languages"), selection: $settingsViewModel.selectedLanguage) {
-        ForEach(SettingsViewModel.Language.allCases, id: \.self) { language in
-          Text(language.displayName).tag(language.code)
+      settingsRow(title: localizationManager.localizedString("settings.languages")) {
+        Picker(localizationManager.localizedString("settings.languages"), selection: $settingsViewModel.selectedLanguage) {
+          ForEach(SettingsViewModel.Language.allCases, id: \.self) { language in
+            Text(language.displayName).tag(language.code)
+          }
         }
+        .pickerStyle(.menu)
+        .fixedSize()
       }
-      .pickerStyle(.menu)
 
       Text(L10n.settingsLanguageRestartHint)
         .font(.caption2)
@@ -279,22 +309,25 @@ public struct SettingsView: View {
   private var settingsLogSectionContent: some View {
     VStack(alignment: .leading, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
-        if SettingsViewModel.LogLevel.allCases.count <= 4 {
-          Picker(L10n.settingsLogLevel, selection: $settingsViewModel.logLevel) {
-            ForEach(SettingsViewModel.LogLevel.allCases, id: \.self) { level in
-              Text(level.displayName).tag(level)
+        settingsRow(title: L10n.settingsLogLevel) {
+          if SettingsViewModel.LogLevel.allCases.count <= 4 {
+            Picker(L10n.settingsLogLevel, selection: $settingsViewModel.logLevel) {
+              ForEach(SettingsViewModel.LogLevel.allCases, id: \.self) { level in
+                Text(level.displayName).tag(level)
+              }
             }
-          }
-          .pickerStyle(.segmented)
-          .help(L10n.settingsLogLevel)
-        } else {
-          Picker(L10n.settingsLogLevel, selection: $settingsViewModel.logLevel) {
-            ForEach(SettingsViewModel.LogLevel.allCases, id: \.self) { level in
-              Text(level.displayName).tag(level)
+            .pickerStyle(.segmented)
+            .help(L10n.settingsLogLevel)
+          } else {
+            Picker(L10n.settingsLogLevel, selection: $settingsViewModel.logLevel) {
+              ForEach(SettingsViewModel.LogLevel.allCases, id: \.self) { level in
+                Text(level.displayName).tag(level)
+              }
             }
+            .pickerStyle(.radioGroup)
+            .fixedSize()
+            .help(L10n.settingsLogLevel)
           }
-          .pickerStyle(.radioGroup)
-          .help(L10n.settingsLogLevel)
         }
         Text(L10n.settingsLogLevelDesc)
           .font(.caption2)
