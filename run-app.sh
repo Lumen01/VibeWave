@@ -90,8 +90,28 @@ echo "📅 Date: $BUILD_DATE"
 
 # ========== 构建 Swift 项目 ==========
 echo "🏗️  Building VibeWave ($BUILD_CONFIG)..."
-BUILD_DIR=$(swift build -c "$BUILD_CONFIG" --show-bin-path)
-swift build -c "$BUILD_CONFIG"
+MACOS_SDK_PATH=$(xcrun --sdk macosx --show-sdk-path)
+MACOS_SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
+MIN_MACOS_VERSION="14.0"
+# Swift Build 可能将 Mach-O 的 SDK 版本错误写成最低系统版本，触发旧版 AppKit 外观。
+# 明确传递实际 SDK 和链接版本，同时保留 macOS 14 的最低运行要求。
+SWIFT_BUILD_ARGS=(
+    -c "$BUILD_CONFIG"
+    --sdk "$MACOS_SDK_PATH"
+    -Xlinker -platform_version
+    -Xlinker macos
+    -Xlinker "$MIN_MACOS_VERSION"
+    -Xlinker "$MACOS_SDK_VERSION"
+)
+BUILD_DIR=$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)
+swift build "${SWIFT_BUILD_ARGS[@]}"
+
+LINKED_SDK_VERSION=$(xcrun vtool -show-build "$BUILD_DIR/VibeWave" | awk '$1 == "sdk" { print $2; exit }')
+if [[ -z "$LINKED_SDK_VERSION" || "$(echo "$LINKED_SDK_VERSION" | sed -E 's/(\.0)+$//')" != "$(echo "$MACOS_SDK_VERSION" | sed -E 's/(\.0)+$//')" ]]; then
+    echo "❌ Linked SDK ($LINKED_SDK_VERSION) does not match build SDK ($MACOS_SDK_VERSION)"
+    exit 1
+fi
+echo "✅ Linked macOS SDK: $LINKED_SDK_VERSION (minimum macOS $MIN_MACOS_VERSION)"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
@@ -163,7 +183,7 @@ cat > "$CONTENTS/Info.plist" <<EOF
     <key>VibeWaveBuildDate</key>
     <string>$BUILD_DATE</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>$MIN_MACOS_VERSION</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>
